@@ -45,7 +45,7 @@ sleep 2
 if [ "$ambaridbtype" == "postgres" ]; then
 
    echo -e "!!!! Taking Ambari DB backup in $BKPDIR/ambaridbbkpi$now.sql!!!! \n"
-PGPASSWORD=$ambaridbpwd  pg_dump --no-owner -h $AMBARIHOST -p 5432 -U $ambariuser  $ambaridb > $BKPDIR/ambaridbbkpi$now.sql
+PGPASSWORD=$ambaridbpwd  pg_dump  -h $AMBARIHOST -p 5432 -U $ambariuser  $ambaridb > $BKPDIR/ambaridbbkpi$now.sql
 
 elif [ "$ambaridbtype" == "mysql" ]; then
    mysqldump -h $AMBARIHOST -u $ambariuser -p$ambaripwd $ambaridb > $BKPDIR/ambaridbbkpi$now.sql

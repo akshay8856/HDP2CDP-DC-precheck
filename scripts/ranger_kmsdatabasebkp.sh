@@ -19,7 +19,7 @@ ranger_kmsdbuser=$(curl -s -u $LOGIN:$PASSWORD --insecure "$protocol://$AMBARIHO
 if [ "$ranger_kmsdbflavour" == "POSTGRES" ]; then
 
    echo -e "!!!! Taking Ranger DB backup in $BKPDIR/ranger_kmsdbbkpi$now.sql  !!!! \n"
-PGPASSWORD=$ranger_kmsdbpwd  pg_dump --no-owner -h $ranger_kmsdbhost -p 5432 -U $ranger_kmsdbuser  $ranger_kmsdbname > $BKPDIR/ranger_kmsdbbkpi$now.sql
+PGPASSWORD=$ranger_kmsdbpwd  pg_dump  -h $ranger_kmsdbhost -p 5432 -U $ranger_kmsdbuser  $ranger_kmsdbname > $BKPDIR/ranger_kmsdbbkpi$now.sql
 
 elif [ "$ranger_kmsdbflavour" == "MYSQL" ]; then
     echo -e "!!!! Taking Ranger DB backup in $BKPDIR/ranger_kmsdbbkpi$now.sql  !!!! \n"

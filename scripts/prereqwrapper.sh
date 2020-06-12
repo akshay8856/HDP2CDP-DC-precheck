@@ -131,21 +131,21 @@ fi
 
 today="$(date +"%Y%m%d%H%M")"
 USER=`whoami`
-mkdir -p /HDP2CDP-DC-precheck/files
-mkdir -p /HDP2CDP-DC-precheck/review/hive
-mkdir -p /HDP2CDP-DC-precheck/review/os
-mkdir -p /HDP2CDP-DC-precheck/review/servicecheck
-mkdir -p /HDP2CDP-DC-precheck/scripts
-mkdir -p /HDP2CDP-DC-precheck/hivechecks
-mkdir -p /HDP2CDP-DC-precheck/logs
-mkdir -p /HDP2CDP-DC-precheck/backup
+mkdir -p /upgrade/files
+mkdir -p /upgrade/review/hive
+mkdir -p /upgrade/review/os
+mkdir -p /upgrade/review/servicecheck
+mkdir -p /upgrade/scripts
+mkdir -p /upgrade/hivechecks
+mkdir -p /upgrade/logs
+mkdir -p /upgrade/backup
 
-INTR=/HDP2CDP-DC-precheck
-HIVECFG=/HDP2CDP-DC-precheck/hivechecks
-SCRIPTDIR=/HDP2CDP-DC-precheck/scripts
-REVIEW=/HDP2CDP-DC-precheck/review
-LOGDIR=/HDP2CDP-DC-precheck/logs
-BKP=/HDP2CDP-DC-precheck/backup
+INTR=/upgrade
+HIVECFG=/upgrade/hivechecks
+SCRIPTDIR=/upgrade/scripts
+REVIEW=/upgrade/review
+LOGDIR=/upgrade/logs
+BKP=/upgrade/backup
 ############################################################################################################
 #
 # 				 ******* CHECKING THE LIST OF SERVICES IN HDP CLUSTER *******
@@ -261,7 +261,7 @@ fi
 if [ ! -f $HIVECFG/hive-sre-shaded.jar ]; then
  echo -e "\e[31m hive-sre-shaded.jar is not available \e[0m"
   echo -e "\e[1m Dwonloading hive-sre-shaded.jar file from : https://github.com/dstreev/cloudera_upgrade_utils/releases \e[21m"
-  wegt -P $HIVECFG/hive-sre-shaded.jar https://github.com/dstreev/cloudera_upgrade_utils/releases/download/2.0.4.0-SNAPSHOT/hive-sre-shaded.jar &>/dev/null
+  wget -P $HIVECFG/  https://github.com/dstreev/cloudera_upgrade_utils/releases/download/2.0.4.0-SNAPSHOT/hive-sre-shaded.jar &>/dev/null
 fi
 
 echo -e "\e[35m########################################################\e[0m\n"
@@ -277,7 +277,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 # Do not change the order of the section marked with *******
 ############################################################################################################
 
-echo -e "\e[96mPREREQ - 1. Ambari Backup :\e[0m  \e[1m Ambari Backup and Config\e[21m \n 1. Taking Backup of ambari.properties \n 2. Taking Backup of ambari-env.sh \n 3. Checking if Namenode Service Timeout Is Configured? \n 4. Running Service Check For All Components"
+echo -e "\e[96mPREREQ - 1. Ambari Backup :\e[0m  \e[1m Ambari Backup and Config\e[21m \n 1. Taking Backup of ambari.properties \n 2. Taking Backup of ambari-env.sh \n 3. Checking if Namenode Service Timeout Is Configured? \n"
 sh $SCRIPTDIR/ambaribkp.sh $AMBARI_HOST $BKP $today $REVIEW/servicecheck &> $LOGDIR/ambaribkp-$today.log &
 
 echo -e "Please check the logs at : \e[1m $LOGDIR/ambaribkp-$today.log \e[21m \n"
@@ -416,7 +416,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 
 
 echo -e "\e[96mPREREQ - 7. HIVE CHECK\e[0m \e[1mRunning Hive table check which includes:\e[21m  \n 1. Hive 3 Upgrade Checks - Locations Scan \n 2. Hive 3 Upgrade Checks - Bad ORC Filenames \n 3. Hive 3 Upgrade Checks - Managed Table Migrations ( Ownership check & Conversion to ACID tables) \n 4. Hive 3 Upgrade Checks - Compaction Check \n 5. Questionable Serde's Check \n 6. Managed Table Shadows \n"
-sh $SCRIPTDIR/hiveprereq.sh $INTR/files/hive_databases.txt $HIVECFG  $REVIEW/hive  &> $LOGDIR/hivetablescan-$today.log &
+sh -x $SCRIPTDIR/hiveprereq.sh $INTR/files/hive_databases.txt $HIVECFG  $REVIEW/hive  &> $LOGDIR/hivetablescan-$today.log &
 echo -e "Output is available in \e[1m $REVIEW/hive directory \e[21m"
 echo -e "Please check the logs at :\e[1m $LOGDIR/hivetablescan-$today.log   \e[21m\n"
 echo -e "\e[35m########################################################\e[0m\n"
@@ -460,4 +460,5 @@ sh $SCRIPTDIR/run_all_service_check.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $REVI
 echo -e "Please check the logs at : \e[1m$LOGDIR/os-servicecheck-$today.log\e[21m\n"
 
 echo -e "\e[35m########################################################\e[0m\n"
+
 

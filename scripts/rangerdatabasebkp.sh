@@ -19,7 +19,7 @@ ranger_dbuser=$(curl -s -u $LOGIN:$PASSWORD --insecure "$protocol://$AMBARIHOST:
 if [ "$ranger_dbflavour" == "POSTGRES" ]; then
 
    echo -e "!!!! Taking Ranger DB backup in $BKPDIR/rangerdbbkpi$now.sql  !!!! \n"
-PGPASSWORD=$rangerdbpwd  pg_dump --no-owner -h $ranger_dbhost -p 5432 -U $ranger_dbuser  $ranger_dbname > $BKPDIR/rangerdbbkpi$now.sql
+PGPASSWORD=$rangerdbpwd  pg_dump  -h $ranger_dbhost -p 5432 -U $ranger_dbuser  $ranger_dbname > $BKPDIR/rangerdbbkpi$now.sql
 
 elif [ "$ranger_dbflavour" == "MYSQL" ]; then
     echo -e "!!!! Taking Ranger DB backup in $BKPDIR/rangerdbbkpi$now.sql  !!!! \n"
