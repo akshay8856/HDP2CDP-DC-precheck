@@ -261,7 +261,7 @@ fi
 if [ ! -f $HIVECFG/hive-sre-shaded.jar ]; then
  echo -e "\e[31m hive-sre-shaded.jar is not available \e[0m"
   echo -e "\e[1m Dwonloading hive-sre-shaded.jar file from : https://github.com/dstreev/cloudera_upgrade_utils/releases \e[21m"
-  wget -P $HIVECFG/  https://github.com/dstreev/cloudera_upgrade_utils/releases/download/2.0.4.0-SNAPSHOT/hive-sre-shaded.jar &>/dev/null
+  wget -P $HIVECFG/ https://github.com/dstreev/cloudera_upgrade_utils/releases/download/2.0.4.0-SNAPSHOT/hive-sre-shaded.jar &>/dev/null
 fi
 
 echo -e "\e[35m########################################################\e[0m\n"
@@ -278,7 +278,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 ############################################################################################################
 
 echo -e "\e[96mPREREQ - 1. Ambari Backup :\e[0m  \e[1m Ambari Backup and Config\e[21m \n 1. Taking Backup of ambari.properties \n 2. Taking Backup of ambari-env.sh \n 3. Checking if Namenode Service Timeout Is Configured? \n"
-sh $SCRIPTDIR/ambaribkp.sh $AMBARI_HOST $BKP $today $REVIEW/servicecheck &> $LOGDIR/ambaribkp-$today.log &
+sh $SCRIPTDIR/ambaribkp.sh $AMBARI_HOST $BKP $today $REVIEW &> $LOGDIR/ambaribkp-$today.log &
 
 echo -e "Please check the logs at : \e[1m $LOGDIR/ambaribkp-$today.log \e[21m \n"
 
@@ -306,7 +306,7 @@ then
 echo -e "\n\e[32mRanger Is Not Installed, Skipping Ranger Database Backup\e[0m"
 else
 echo -e "\n\e[96mPREREQ - 2. Ranger Database \e[0m \e[1mTaking Backup of Ranger DB\e[21m"
-sh  $SCRIPTDIR/rangerdatabasebkp.sh $AMBARI_HOST $BKP $today $RANGERPASSWORD $PROTOCOL $LOGIN $PASSWORD  &> $LOGDIR/rangerdatabasebkp-$today.log &
+sh -x  $SCRIPTDIR/rangerdatabasebkp.sh $AMBARI_HOST $BKP $today $RANGERPASSWORD $PROTOCOL $LOGIN $PASSWORD $REVIEW &> $LOGDIR/rangerdatabasebkp-$today.log &
 echo -e "Please check the logs at : \e[1m$LOGDIR/rangerdatabasebkp-$today.log \e[21m  \n"
 fi
 echo -e "\e[35m########################################################\e[0m\n"
@@ -328,7 +328,7 @@ then
 echo -e "\n\e[32mRanger_KMS Is Not Installed, Skipping Ranger_KMS Database Backup\e[0m"
 else
 echo -e "\n\e[96mPREREQ - 3. Ranger_KMS Database \e[0m \e[1mTaking Backup of Ranger_KMS DB\e[21m"
-sh  $SCRIPTDIR/ranger_kmsdatabasebkp.sh $AMBARI_HOST $BKP $today $RANGER_KMS_PASSWORD $PROTOCOL $LOGIN $PASSWORD &> $LOGDIR/ranger_kms_databasebkp-$today.log &
+sh  $SCRIPTDIR/ranger_kmsdatabasebkp.sh $AMBARI_HOST $BKP $today $RANGER_KMS_PASSWORD $PROTOCOL $LOGIN $PASSWORD $REVIEW &> $LOGDIR/ranger_kms_databasebkp-$today.log &
 echo -e "Please check the logs at : \e[1m$LOGDIR/ranger_kms_databasebkp-$today.log \e[21m  \n"
 fi
 echo -e "\e[35m########################################################\e[0m\n"
@@ -416,7 +416,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 
 
 echo -e "\e[96mPREREQ - 7. HIVE CHECK\e[0m \e[1mRunning Hive table check which includes:\e[21m  \n 1. Hive 3 Upgrade Checks - Locations Scan \n 2. Hive 3 Upgrade Checks - Bad ORC Filenames \n 3. Hive 3 Upgrade Checks - Managed Table Migrations ( Ownership check & Conversion to ACID tables) \n 4. Hive 3 Upgrade Checks - Compaction Check \n 5. Questionable Serde's Check \n 6. Managed Table Shadows \n"
-sh -x $SCRIPTDIR/hiveprereq.sh $INTR/files/hive_databases.txt $HIVECFG  $REVIEW/hive  &> $LOGDIR/hivetablescan-$today.log &
+sh $SCRIPTDIR/hiveprereq.sh $INTR/files/hive_databases.txt $HIVECFG  $REVIEW/hive  &> $LOGDIR/hivetablescan-$today.log &
 echo -e "Output is available in \e[1m $REVIEW/hive directory \e[21m"
 echo -e "Please check the logs at :\e[1m $LOGDIR/hivetablescan-$today.log   \e[21m\n"
 echo -e "\e[35m########################################################\e[0m\n"
