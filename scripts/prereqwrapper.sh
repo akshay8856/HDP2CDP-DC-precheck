@@ -131,14 +131,14 @@ fi
 
 today="$(date +"%Y%m%d%H%M")"
 USER=`whoami`
-mkdir -p /upgrade/files
-mkdir -p /upgrade/review/hive
-mkdir -p /upgrade/review/os
-mkdir -p /upgrade/review/servicecheck
-mkdir -p /upgrade/scripts
-mkdir -p /upgrade/hivechecks
-mkdir -p /upgrade/logs
-mkdir -p /upgrade/backup
+mkdir -p /HDP2CDP-DC-precheck/files
+mkdir -p /HDP2CDP-DC-precheck/review/hive
+mkdir -p /HDP2CDP-DC-precheck/review/os
+mkdir -p /HDP2CDP-DC-precheck/review/servicecheck
+mkdir -p /HDP2CDP-DC-precheck/scripts
+mkdir -p /HDP2CDP-DC-precheck/hivechecks
+mkdir -p /HDP2CDP-DC-precheck/logs
+mkdir -p /HDP2CDP-DC-precheck/backup
 
 INTR=/upgrade
 HIVECFG=/upgrade/hivechecks
