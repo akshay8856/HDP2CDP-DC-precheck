@@ -131,21 +131,21 @@ fi
 
 today="$(date +"%Y%m%d%H%M")"
 USER=`whoami`
-mkdir -p /upgrade/files
-mkdir -p /upgrade/review/hive
-mkdir -p /upgrade/review/os
-mkdir -p /upgrade/review/servicecheck
-mkdir -p /upgrade/scripts
-mkdir -p /upgrade/hivechecks
-mkdir -p /upgrade/logs
-mkdir -p /upgrade/backup
+mkdir -p /HDP2CDP-DC-precheck/files
+mkdir -p /HDP2CDP-DC-precheck/review/hive
+mkdir -p /HDP2CDP-DC-precheck/review/os
+mkdir -p /HDP2CDP-DC-precheck/review/servicecheck
+mkdir -p /HDP2CDP-DC-precheck/scripts
+mkdir -p /HDP2CDP-DC-precheck/hivechecks
+mkdir -p /HDP2CDP-DC-precheck/logs
+mkdir -p /HDP2CDP-DC-precheck/backup
 
-INTR=/upgrade
-HIVECFG=/upgrade/hivechecks
-SCRIPTDIR=/upgrade/scripts
-REVIEW=/upgrade/review
-LOGDIR=/upgrade/logs
-BKP=/upgrade/backup
+INTR=/HDP2CDP-DC-precheck
+HIVECFG=/HDP2CDP-DC-precheck/hivechecks
+SCRIPTDIR=/HDP2CDP-DC-precheck/scripts
+REVIEW=/HDP2CDP-DC-precheck/review
+LOGDIR=/HDP2CDP-DC-precheck/logs
+BKP=/HDP2CDP-DC-precheck/backup
 ############################################################################################################
 #
 # 				 ******* CHECKING THE LIST OF SERVICES IN HDP CLUSTER *******
