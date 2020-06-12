@@ -11,7 +11,6 @@ date=$7
 intr=$8
 protocol=$9
 
-
 # Configuring cluster name
 cluster_name=$(curl -s -u $LOGIN:$PASSWORD --insecure "$protocol://$AMBARI_HOST:$PORT/api/v1/clusters"  | python -mjson.tool | perl -ne '/"cluster_name":.*?"(.*?)"/ && print "$1\n"')
 
@@ -45,7 +44,7 @@ echo -e "\nOS compatibility check completed for$cluster_name. \n please check th
 
 echo -e "\nCluster name to run service check on is: $cluster_name"
  
-running_components=$(curl -s -u $LOGIN:$PASSWORD --insecure "$protocol://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/services?fields=ServiceInfo/service_name&ServiceInfo/maintenance_state=OFF" | python -mjson.tool | perl -ne '/"service_name":.*?"(.*?)"/ && print "$1\n"')
+running_components=$(curl -s -u $LOGIN:$PASSWORD --insecure "$protocol://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/services?fields=ServiceInfo/service_name" | python -mjson.tool | perl -ne '/"service_name":.*?"(.*?)"/ && print "$1\n"')
 if [ -z "$running_components" ]; then
     exit
 fi

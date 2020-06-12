@@ -3,6 +3,7 @@
 AMBARIHOST=$1
 BKPDIR=$2
 now=$3
+out=$4
 
 echo -e "Taking backup of ambari.properties file at $BKPDIR/ambari.properties \n"
 ssh $AMBARIHOST cat /etc/ambari-server/conf/ambari.properties > $BKPDIR/ambari.properties 
@@ -18,7 +19,17 @@ ambaridbtype=`grep -i server.jdbc.database= /tmp/ambari.properties | awk -F'=' '
 ambariuser=`grep -i server.jdbc.user.name /tmp/ambari.properties | awk -F'=' '{print $2}'`
 ambaridb=`grep -i server.jdbc.database_name /tmp/ambari.properties | awk -F'=' '{print $2}'`
 
+echo -e "Checking if upgrade.parameter.nn-restart.timeout is configured in Ambari\n"
+echo -e "Checking if upgrade.parameter.nn-restart.timeout is configured in Ambari\n" >> $out/namenode-timeout-$now.out
 #echo $ambaripwdfile $ambaripwd $ambaridb $ambariuser
+nntimeout=`grep -i upgrade.parameter.nn-restart.timeout $BKPDIR/ambari.properties`
+if [ -z "$nntimeout" ];then
+echo -e "upgrade.parameter.nn-restart.timeout is NOT configured !!!"
+echo -e "For example, record the time (seconds) required to restart the active NameNode for your current Ambari server version.\n If restarting takes 10 minutes, (600 seconds), then add upgrade.parameter.nn-restart.timeout=660 to the /etc/ambari-server/conf/ambari.properties file on the Ambari Server host.\n After adding or resetting the Ambari NameNode restart parameter, restart your Ambari server before starting the HDP upgrade."
+echo -e "upgrade.parameter.nn-restart.timeout is NOT configured !!!i \n" >> $out/namenode-timeout-$now.out
+echo -e "For example, record the time (seconds) required to restart the active NameNode for your current Ambari server version.\n If restarting takes 10 minutes, (600 seconds), then add upgrade.parameter.nn-restart.timeout=660 to the /etc/ambari-server/conf/ambari.properties file on the Ambari Server host.\n After adding or resetting the Ambari NameNode restart parameter, restart your Ambari server before starting the HDP upgrade." >> $out/namenode-timeout-$now.out
+fi
+
 
 echo -e "!!!! Stopping Ambari Server !!!!\n"
 ssh $AMBARIHOST ambari-server stop

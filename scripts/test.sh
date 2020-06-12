@@ -461,3 +461,4 @@ echo -e "Please check the logs at : \e[1m$LOGDIR/os-servicecheck-$today.log\e[21
 
 echo -e "\e[35m########################################################\e[0m\n"
 
+done
