@@ -7,7 +7,7 @@ ranger_kmsdbpwd=$4
 protocol=$5
 LOGIN=$6
 PASSWORD=$7
-review=$8
+vcheck=$8
 
 ranger_kmsdbhost=$(curl -s -u $LOGIN:$PASSWORD --insecure "$protocol://$AMBARIHOST:8080/api/v1/clusters/c3110/configurations/service_config_versions?service_name=RANGER_KMS" | grep -w db_host | awk -F ':' '{print $2}' | awk -F '"' '{print $2}' | tail -1)
 ranger_kmsdbflavour=$(curl -s -u $LOGIN:$PASSWORD --insecure "$protocol://$AMBARIHOST:8080/api/v1/clusters/c3110/configurations/service_config_versions?service_name=RANGER_KMS" | grep -w DB_FLAVOR | awk -F ':' '{print $2}' | awk -F '"' '{print $2}' | tail -1)
@@ -25,7 +25,7 @@ if [ "$ranger_kmsdbflavour" == "POSTGRES" ]; then
    echo -e "!!!! Checking Ranger_KMS Database Version!!!"
    kmsraw=`PGPASSWORD=$ranger_kmsdbpwd  psql -h $ranger_kmsdbhost -U $ranger_kmsdbuser -c 'SHOW server_version;'`
    kmsdbv=`echo $kmsraw | awk '{print $3}'`
-   echo "$ranger_kmsdbflavour:$kmsdbv" >> $review/DB-versioncehck-$now.out 
+   echo "RANGER_KMS:$ranger_kmsdbflavour:$kmsdbv" >> $vcheck/files/DB-versioncheck-$now.out 
 
 elif [ "$ranger_kmsdbflavour" == "MYSQL" ]; then
     echo -e "!!!! Taking Ranger_KMS DB backup in $BKPDIR/ranger_kmsdbbkpi$now.sql  !!!! \n"
@@ -34,7 +34,7 @@ elif [ "$ranger_kmsdbflavour" == "MYSQL" ]; then
     echo -e "!!!! Checking Ranger_KMS Database Version!!!"
     kmsraw=`mysql -h $ranger_kmsdbhost -u $ranger_kmsdbuser -p$ranger_kmsdbpwd -e "SELECT VERSION();" |grep "\|"`
     kmsdbv=`echo $kmsraw | awk -F ' ' '{print $2}'`
-    acho "$ranger_kmsdbflavour:$kmsdbv" >>  $review/DB-versioncehck-$now.out
+    echo "RANGER_KMS:$ranger_kmsdbflavour:$kmsdbv" >>  $vcheck/files/DB-versioncheck-$now.out
 
 else 
   echo -e  "Please configure this script with the command to take backup for $ranger_kmsdbflavour\n"

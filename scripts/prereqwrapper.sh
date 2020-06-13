@@ -128,24 +128,25 @@ fi
 # Do not change the order of the section marked with *******
 ############################################################################################################
 
+INTR=/upgrade
+HIVECFG=$INTR/hivechecks
+SCRIPTDIR=$INTR/scripts
+REVIEW=$INTR/review
+LOGDIR=$INTR/logs
+BKP=$INTR/backup
 
 today="$(date +"%Y%m%d%H%M")"
 USER=`whoami`
-mkdir -p /HDP2CDP-DC-precheck/files
-mkdir -p /HDP2CDP-DC-precheck/review/hive
-mkdir -p /HDP2CDP-DC-precheck/review/os
-mkdir -p /HDP2CDP-DC-precheck/review/servicecheck
-mkdir -p /HDP2CDP-DC-precheck/scripts
-mkdir -p /HDP2CDP-DC-precheck/hivechecks
-mkdir -p /HDP2CDP-DC-precheck/logs
-mkdir -p /HDP2CDP-DC-precheck/backup
+mkdir -p $INTR/files
+mkdir -p $INTR/review/hive
+mkdir -p $INTR/review/os
+mkdir -p $INTR/review/servicecheck
+mkdir -p $INTR/scripts
+mkdir -p $INTR/hivechecks
+mkdir -p $INTR/logs
+mkdir -p $INTR/backup
 
-INTR=/upgrade
-HIVECFG=/upgrade/hivechecks
-SCRIPTDIR=/upgrade/scripts
-REVIEW=/upgrade/review
-LOGDIR=/upgrade/logs
-BKP=/upgrade/backup
+
 ############################################################################################################
 #
 # 				 ******* CHECKING THE LIST OF SERVICES IN HDP CLUSTER *******
@@ -202,6 +203,7 @@ hmsjdbc=$(curl -s -u $LOGIN:$PASSWORD --insecure $PROTOCOL://$AMBARI_HOST:$PORT/
 hms_jdbc_uri=`echo $hmsjdbc | awk -F ',' '{print $1}' | awk -F '"' '{print $4}' | cut -d? -f1`
 hmsdb_user=`echo $hmsjdbc |  awk -F ',' '{print $2}' | awk -F ':' '{print $2}' | awk -F '"' '{print $2}'`
 hms_dtype=`echo $hms_jdbc_uri | awk -F ':' '{print $2}'`
+hms_dbhost=`echo $hms_jdbc_uri | awk -F '/' '{print $3}'`
 
 # Function to create config.yaml file
 create_payload ()
@@ -236,7 +238,7 @@ fi
 
 if  [ "$hms_dtype" == "mysql" ];then
 
- 	if [ ! -f /usr/share/java/mysql-connector-java.jar ]; then
+ 	if [ ! -f /usr/share/java/mysql-connector-java.jar ] ; then
      	 echo -e "\e[31mUnable to Find Mysql JDBC jar ! \e[0m"
     	 echo -e "\e[1mInstalling Mysql JDBC package\e[21m \n"
     	 yum install mysql-connector-java* -y &> $LOGDIR/hivetablescan-$today.log ; sleep 10 ;cp /usr/share/java/mysql-connector-java.jar $HIVECFG/mysql-connector-java.jar
@@ -278,9 +280,23 @@ echo -e "\e[35m########################################################\e[0m\n"
 ############################################################################################################
 
 echo -e "\e[96mPREREQ - 1. Ambari Backup :\e[0m  \e[1m Ambari Backup and Config\e[21m \n 1. Taking Backup of ambari.properties \n 2. Taking Backup of ambari-env.sh \n 3. Checking if Namenode Service Timeout Is Configured? \n"
-sh $SCRIPTDIR/ambaribkp.sh $AMBARI_HOST $BKP $today $REVIEW &> $LOGDIR/ambaribkp-$today.log &
 
-echo -e "Please check the logs at : \e[1m $LOGDIR/ambaribkp-$today.log \e[21m \n"
+while true; do
+    read -p $'\e[96mWe will need to start and stop Ambari. Please confirm if we should proceed (y/n) ? :\e[0m' yn
+    case $yn in
+        [Yy]* ) sh $SCRIPTDIR/ambaribkp.sh $AMBARI_HOST $BKP $today $INTR $REVIEW &> $LOGDIR/ambaribkp-$today.log & break;;
+        [Nn]* ) exit;;
+        * ) echo "Please answer yes or no.";;
+    esac
+done
+#sh $SCRIPTDIR/ambaribkp.sh $AMBARI_HOST $BKP $today $REVIEW &> $LOGDIR/ambaribkp-$today.log &
+echo -e "Please check the logs in the file: \e[1m $LOGDIR/ambaribkp-$today.log \e[21m \n"
+echo -e "Backup of Ambari Datase, ambari.properties, and ambari-env.sh is available in:\e[1m $BKP \e[21m Directory\n"
+
+echo -e "\e[35m########################################################\e[0m\n"
+
+echo -e "\n\e[96mPREREQ - 2. Namenode Upgrade Timeout Check \e[0m"
+echo -e "\e[1mOutput is available in the file: $REVIEW/servicecheck/namenode-timeout-$today.out \e[21m"
 
 echo -e "\e[35m########################################################\e[0m\n"
 # Need to allow some time for Ambari to start and get heatbeats from all agents.
@@ -288,6 +304,9 @@ echo -e "\e[35m########################################################\e[0m\n"
 echo -e "\e[1mWaiting for a minute for Ambari to Start & receive heatbeats from all agents\e[21m"
 # Increase time for large clusters
 sleep 60
+
+echo -e "\e[35m########################################################\e[0m\n"
+
 
 ############################################################################################################
 #
@@ -305,9 +324,10 @@ if [ -z "$isranger" ]
 then
 echo -e "\n\e[32mRanger Is Not Installed, Skipping Ranger Database Backup\e[0m"
 else
-echo -e "\n\e[96mPREREQ - 2. Ranger Database \e[0m \e[1mTaking Backup of Ranger DB\e[21m"
-sh -x  $SCRIPTDIR/rangerdatabasebkp.sh $AMBARI_HOST $BKP $today $RANGERPASSWORD $PROTOCOL $LOGIN $PASSWORD $REVIEW &> $LOGDIR/rangerdatabasebkp-$today.log &
-echo -e "Please check the logs at : \e[1m$LOGDIR/rangerdatabasebkp-$today.log \e[21m  \n"
+echo -e "\n\e[96mPREREQ - 3. Ranger Database \e[0m \e[1mTaking Backup of Ranger DB\e[21m"
+sh  $SCRIPTDIR/rangerdatabasebkp.sh $AMBARI_HOST $BKP $today $RANGERPASSWORD $PROTOCOL $LOGIN $PASSWORD $INTR &> $LOGDIR/rangerdatabasebkp-$today.log &
+echo -e "\e[1mRanger_KMS DB back is available in: $BKP/rangerdbbkpi$today.sql \e[21m"
+echo -e "Please check the logs in the file: \e[1m$LOGDIR/rangerdatabasebkp-$today.log \e[21m  \n"
 fi
 echo -e "\e[35m########################################################\e[0m\n"
 
@@ -327,9 +347,11 @@ if [ -z "$israngerkms" ]
 then
 echo -e "\n\e[32mRanger_KMS Is Not Installed, Skipping Ranger_KMS Database Backup\e[0m"
 else
-echo -e "\n\e[96mPREREQ - 3. Ranger_KMS Database \e[0m \e[1mTaking Backup of Ranger_KMS DB\e[21m"
-sh  $SCRIPTDIR/ranger_kmsdatabasebkp.sh $AMBARI_HOST $BKP $today $RANGER_KMS_PASSWORD $PROTOCOL $LOGIN $PASSWORD $REVIEW &> $LOGDIR/ranger_kms_databasebkp-$today.log &
-echo -e "Please check the logs at : \e[1m$LOGDIR/ranger_kms_databasebkp-$today.log \e[21m  \n"
+echo -e "\n\e[96mPREREQ - 4. Ranger_KMS Database \e[0m \e[1mTaking Backup of Ranger_KMS DB\e[21m"
+sh  $SCRIPTDIR/ranger_kmsdatabasebkp.sh $AMBARI_HOST $BKP $today $RANGER_KMS_PASSWORD $PROTOCOL $LOGIN $PASSWORD $INTR &> $LOGDIR/ranger_kms_databasebkp-$today.log &
+
+echo -e "\e[1mRanger_KMS DB back is available in: $BKP/ranger_kmsdbbkpi$today.sql \e[21m"
+echo -e "Please check the logs in the file: \e[1m$LOGDIR/ranger_kms_databasebkp-$today.log \e[21m  \n"
 fi
 echo -e "\e[35m########################################################\e[0m\n"
 
@@ -340,20 +362,21 @@ echo -e "\e[35m########################################################\e[0m\n"
 # NOTE : This section is depended on output of  "CHECKING THE LIST OF SERVICES IN HDP CLUSTER"
 ############################################################################################################
 
-echo -e "\e[96mPREREQ - 4. Unsupported Services\e[0m \e[1mServices Installed - to be deleted before upgrade\e[21m"
+echo -e "\e[96mPREREQ - 5. Unsupported Services\e[0m \e[1mServices Installed - to be deleted before upgrade\e[21m"
 services=`egrep -i "storm|ACCUMULO|SMARTSENSE|Superset|Flume|Mahout|Falcon|Slider|WebHCat|spark" $INTR/files/services.txt | grep -v -i spark2 | tr -s '\n ' ','`
 services=${services%,}
 
-echo -e "\e[31m Below services are installed in cluster $cluster_name and will be deleted as a part of upgrade:\e[0m  \n \e[1m$services\e[21m\n"
-
+echo -e "\e[31mBelow services are installed in cluster $cluster_name and will be deleted as a part of upgrade:\e[0m  \n \e[1m$services\e[21m\n"
 echo -e "\n\e[31m- You can plan to remove these services before upgarde\e[0m"
 echo -e "\e[31m- Removing Druid and Accumulo services cause data loss\e[0m"
 echo -e "\e[31m- Do not proceed with the upgrade to HDP 7.1.1.0 if you want to continue with Druid and Accumulo services.\e[0m"
 echo -e "\e[31m- Storm can be replaced with Cloudera Streaming Analytics (CSA) powered by Apache Flink. Contact your Cloudera account team for more information about moving from Storm to CSA\e[0m\n"
 echo -e "\e[31m- Flume workloads can be migrated to Cloudera Flow Management (CFM). CFM is a no-code data ingestion and management solution powered by Apache NiFi.\e[0m \n"
+echo -e "########################################################\n" >>  $REVIEW/servicecheck/RemoveServices-$today.out
 echo -e "Below services are installed in cluster $cluster_name and will be deleted as a part of upgrade:  \n $services \n\n * You can plan to remove these services before upgarde \n * Removing the Druid and Accumulo services cause data loss \n * Do not proceed with the upgrade to HDP 7.1.1.0 if you want to continue with Druid and Accumulo services \n * Storm can be replaced with Cloudera Streaming Analytics (CSA) powered by Apache Flink. Contact your Cloudera account team for more information about moving from Storm to CSA \n * Flume workloads can be migrated to Cloudera Flow Management (CFM). CFM is a no-code data ingestion and management solution powered by Apache NiFi\n"  >>  $REVIEW/servicecheck/RemoveServices-$today.out
 echo -e "########################################################\n" >>  $REVIEW/servicecheck/RemoveServices-$today.out
-echo -e "\e[35m########################################################\e[0m\n"
+
+#echo -e "\e[35m########################################################\e[0m\n"
 
 
 ############################################################################################################
@@ -364,7 +387,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 # NOTE : This section is depended on output of  "CHECKING THE LIST OF SERVICES IN HDP CLUSTER"
 ############################################################################################################
 
-echo -e "\e[96mPREREQ - 5. HDF Mpack Check\e[0m \e[1mChecking If Nifi Is Installed?\e[21m\n"
+echo -e "\e[96mPREREQ - 6. HDF Mpack Check\e[0m \e[1mChecking If Nifi Is Installed?\e[21m\n"
 isnifi=`grep -wi "NIFI" $INTR/files/services.txt | tr -s '\n ' ','`
 isnifi=${isnifi%,}
 
@@ -373,11 +396,11 @@ then
 echo -e "\e[1mNiFi is not installed in cluster $cluster_name\e[21m"
 echo -e "\e[1mHDF mpack check completed\e[21m\n"
 else
-echo -e "\e[31m HDF Mpack is installed in $cluster_name \n Please remove it before upgrade\e[0m"
+echo -e "\e[31mHDF Mpack is installed in $cluster_name \n Please remove it before upgrade\e[0m"
 echo -e "HDF Mpack is installed in $cluster_name \n Please remove it before upgrade" >> $REVIEW/servicecheck/RemoveServices-$today.out
 echo -e "\e[1mHDF mpack check completed\e[21m\n"
 fi
-echo -e "Please check the output at \e[1m$REVIEW/servicecheck/RemoveServices-$today.out\e[21m for the actions to take on components installed in cluster $cluster_name\e[0m \n"
+echo -e "Please check the output in the file:\e[1m$REVIEW/servicecheck/RemoveServices-$today.out\e[21m for the actions to take on components installed in cluster $cluster_name\e[0m \n"
 echo -e "\e[35m########################################################\e[0m\n"
 
 
@@ -388,7 +411,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 # NOTE : This section is depended on output of  "CHECKING THE LIST OF SERVICES IN HDP CLUSTER"
 # ADD MORE SERVICES for example: SR, SAM etc...
 ############################################################################################################
-echo -e "\e[96mPREREQ - 6. Third Party \e[0m \e[1mThird Party Services to be deleted before upgrade\e[21m"
+echo -e "\e[96mPREREQ - 7. Third Party \e[0m \e[1mThird Party Services to be deleted before upgrade\e[21m"
 
 thirdparty=`egrep -vi "AMBARI_INFRA|AMBARI_METRICS|ATLAS|FLUME|HBASE|HDFS|HIVE|KAFKA|MAPREDUCE2|PIG|RANGER|RANGER_KMS|SLIDER|SMARTSENSE|SPARK|SPARK2|SQOOP|TEZ|YARN|ZOOKEEPER|NIFI|KERBEROS|KNOX|ACCUMULO|DRUID|MAHOUT|SUPERSET" $INTR/files/services.txt | grep -v -i spark2 | tr -s '\n ' ','`
 thirdparty=${thirdparty%,}
@@ -396,8 +419,9 @@ thirdparty=${thirdparty%,}
 if [ -z "$thirdparty" ];then
 echo -e "\e[1mThere are no Third Party Services installed on this cluster $cluster_name\e[21m\n"
 else
-echo -e "\e[31m Below Third Party services are installed in cluster $cluster_name \nPlease remove this before upgrade:\e[0m \n\e[1m $thirdparty\e[21m"
+echo -e "\e[31mBelow Third Party services are installed in cluster $cluster_name \nPlease remove this before upgrade:\e[0m \n\e[1m $thirdparty\e[21m"
 echo -e "Below Third Party services are installed in cluster $cluster_name \nPlease remove this before  upgrade: \n$thirdparty"  >> $REVIEW/servicecheck/third-party-$today.out
+echo -e "\e[1mOutput is available in the file: $REVIEW/servicecheck/third-party-$today.out \e[21m"
 fi
 echo -e "\e[35m########################################################\e[0m\n"
 
@@ -413,12 +437,30 @@ echo -e "\e[35m########################################################\e[0m\n"
 # # hdfs dfs -setfacl -R -m user:root:rwx /
 # NEED TO ADD SUPPORT FOR KERBEROS
 ############################################################################################################
+echo -e "\e[96mPREREQ - 8. HIVE CHECK\e[0m \e[1mRunning Hive table check which includes:\e[21m  \n 1. Hive 3 Upgrade Checks - Locations Scan \n 2. Hive 3 Upgrade Checks - Bad ORC Filenames \n 3. Hive 3 Upgrade Checks - Managed Table Migrations ( Ownership check & Conversion to ACID tables) \n 4. Hive 3 Upgrade Checks - Compaction Check \n 5. Questionable Serde's Check \n 6. Managed Table Shadows \n"
+if  [ "$hms_dtype" == "mysql" ];then
 
+    echo -e "\e[1m!!!! Checking HiveMetastore Database Version!!!\e[21m"
+    hmsraw=`mysql -h $hms_dbhost -u $hmsdb_user -p$hms_dbpwd -e "SELECT VERSION();" |grep "\|"`
+    hmsdbv=`echo $hmsraw | awk -F ' ' '{print $2}'`
+    echo "HiveMetastore:$hms_dtype:$hmsdbv" >>  $INTR/files/DB-versioncheck-$today.out
+ 	
 
-echo -e "\e[96mPREREQ - 7. HIVE CHECK\e[0m \e[1mRunning Hive table check which includes:\e[21m  \n 1. Hive 3 Upgrade Checks - Locations Scan \n 2. Hive 3 Upgrade Checks - Bad ORC Filenames \n 3. Hive 3 Upgrade Checks - Managed Table Migrations ( Ownership check & Conversion to ACID tables) \n 4. Hive 3 Upgrade Checks - Compaction Check \n 5. Questionable Serde's Check \n 6. Managed Table Shadows \n"
+elif  [ "$hms_dtype" == "postgresql" ];then
+
+   echo -e "\e[1m!!!! Checking HiveMetastore Database Version!!!\e[21m"
+   hmsraw=`PGPASSWORD=$hms_dbpwd psql -h $hms_dbhost -U $hmsdb_user -c 'SHOW server_version;'`
+   hmsdbv=`echo $kmsraw | awk '{print $3}'`
+   echo "HiveMetastore:$hms_dtype:$hmsdbv" >> $INTR/files/DB-versioncheck-$today.out
+
+else 
+
+    echo -e "Add command for checking database version of $hms_dtype"
+fi
+
 sh $SCRIPTDIR/hiveprereq.sh $INTR/files/hive_databases.txt $HIVECFG  $REVIEW/hive  &> $LOGDIR/hivetablescan-$today.log &
 echo -e "Output is available in \e[1m $REVIEW/hive directory \e[21m"
-echo -e "Please check the logs at :\e[1m $LOGDIR/hivetablescan-$today.log   \e[21m\n"
+echo -e "Please check the logs in the file:\e[1m $LOGDIR/hivetablescan-$today.log   \e[21m\n"
 echo -e "\e[35m########################################################\e[0m\n"
 
 sleep 5
@@ -429,16 +471,36 @@ sleep 5
 #
 ############################################################################################################
 
-echo -e "\e[96mPREREQ - 8. AUTO RESTART \e[0m \e[1mCheck If Auto Restart Is enabled ?\e[21m "
+echo -e "\e[96mPREREQ - 9. AUTO RESTART \e[0m \e[1mCheck If Auto Restart Is enabled ?\e[21m "
 autorestart=$(curl -s -u $LOGIN:$PASSWORD --insecure $PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/components?fields=ServiceComponentInfo/service_name,ServiceComponentInfo/recovery_enabled | grep -w '"recovery_enabled" : "true"' -B1  -A1 | grep -w '"component_name"' | awk -F ':' '{print $2}' | awk -F '"' '{print $2}' | tr -s '\n ' ',') 
 autorestart=${autorestart%,}
 
 if [ -z "$autorestart" ];then
 echo -e "\e[1mAuto Restart is disabled for all the components in $cluster_name\e[21m\n"
 else
-echo -e "\e[31m Please Disable Auto Restart for Following Components :  \e[0m \n \e[1m$autorestart\e[21m\n"
+echo -e "\e[31mPlease Disable Auto Restart for Following Components :  \e[0m \n \e[1m$autorestart\e[21m\n"
 echo -e "Please Disable Auto Restart for Following Components : \n$autorestart " >> $REVIEW/servicecheck/DisableAutoRestart-$today.out
-echo -e "\e[1mOutput is available at $REVIEW/servicecheck/DisableAutoRestart-$today.out \e[21m"
+echo -e "\e[1mOutput is available in the file: $REVIEW/servicecheck/DisableAutoRestart-$today.out \e[21m"
+fi
+echo -e "\e[35m########################################################\e[0m\n"
+
+
+############################################################################################################
+#
+# 					DATABASE COMPATIBLITY CHECK
+#
+############################################################################################################
+
+echo -e "\e[96mPREREQ - 10. DATABASE COMPATIBLITY CHECK \e[0m \e[1mChecking if database versions are supported ?\e[21m "
+echo -e "\e[1m Initiating Database Version Checks for required components\e[21m "
+
+if [ -f $INTR/files/DB-versioncheck-$today.out ]; then
+sh $SCRIPTDIR/dbcompatible.sh $INTR/files/DB-versioncheck-$today.out $today $REVIEW/servicecheck &> $LOGDIR/DatabaseCompatibiltiyCheck-$today.log
+echo -e "\e[1mOutput is available in the file: $REVIEW/servicecheck/DatabaseCompatibiltiyCheck-$today.out \e[21m"
+echo -e "\e[1mPlease check the logs in the file : $LOGDIR/DatabaseCompatibiltiyCheck-$today.log  \e[21m"
+else 
+ echo -e "\e[31mDatabase version file $INTR/files/DB-versioncheck-$today.out does not exist ! \e[0m"
+ echo -e "\e[31mPlease analyse the logs: $LOGDIR/rangerdatabasebkp-$today.log $LOGDIR/ranger_kms_databasebkp-$today.log $LOGDIR/hivetablescan-$today.log to find the problem ! \e[0m"
 fi
 echo -e "\e[35m########################################################\e[0m\n"
 
@@ -453,12 +515,12 @@ echo -e "\e[35m########################################################\e[0m\n"
 ############################################################################################################
 
 
-echo -e "\n\e[96mPREREQ - 9. OS & Service Check \e[0m  \e[1mChecking OS compatibility and running service check\e[21m"
+echo -e "\n\e[96mPREREQ - 11. OS & Service Check \e[0m  \e[1mChecking OS compatibility and running service check\e[21m"
 
 sh $SCRIPTDIR/run_all_service_check.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $REVIEW/os $REVIEW/servicecheck $today $INTR/files/ $PROTOCOL &> $LOGDIR/os-servicecheck-$today.log  &
 
-echo -e "Please check the logs at : \e[1m$LOGDIR/os-servicecheck-$today.log\e[21m\n"
-
+echo -e "\e[1mOutput is available in the file: $REVIEW/os/oscheck-$today.out \e[21m"
+echo -e "Please check the logs in the file: \e[1m$LOGDIR/os-servicecheck-$today.log\e[21m\n"
 echo -e "\e[35m########################################################\e[0m\n"
 
 
