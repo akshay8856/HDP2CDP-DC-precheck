@@ -128,7 +128,7 @@ fi
 # Do not change the order of the section marked with *******
 ############################################################################################################
 
-INTR=//HDP2CDP-DC-precheck
+INTR=/HDP2CDP-DC-precheck
 HIVECFG=$INTR/hivechecks
 SCRIPTDIR=$INTR/scripts
 REVIEW=$INTR/review
