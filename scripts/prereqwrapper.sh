@@ -162,7 +162,8 @@ echo -e "\e[35m########################################################\e[0m\n"
 ## Do not change the order of the section marked with *******
 ############################################################################################################
 isranger=`grep -w "RANGER" $INTR/files/services.txt`
-israngerkms=`grep -w "RANGER_KMS" $INTR/files/services.txt | tr -s '\n ' ','`
+israngerkms=`grep -w "RANGER_KMS" $INTR/files/services.txt`
+ishive=`grep -w "HIVE" $INTR/files/services.txt`
 
 if [ -z "$isranger" ]
 then
@@ -184,20 +185,46 @@ read -s "rkmspwd"
 RANGER_KMS_PASSWORD=$rkmspwd
 fi
 
-echo -en "\n\n\e[96mPlease enter the password of Hive Metasore Database: \e[0m"
-read -s "hmspwd"
-hms_dbpwd=$hmspwd
 
-echo -e "\n\e[1mHiveServer2 JDBC URI should be the exact string used to connect using beeline \nFor example: jdbc:hive2://c1110-node4.coelab.cloudera.com:10000/ \e[21m\n "
-echo -en "\e[96mPlease enter the JBDC URI for HiveServer2: \e[0m"
-read "hs2jdbc"
-hs2jdbcuri=$hs2jdbc
+###  Entering Hive check Loop
+
+if [ -z "$ishive" ]
+then
+   :
+else
+ echo -en "\n\n\e[96mPlease enter the password of Hive Metasore Database: \e[0m"
+ read -s "hmspwd"
+ hms_dbpwd=$hmspwd
+
+ echo -e "\n\e[1mHiveServer2 JDBC URI should be the exact string used to connect using beeline \nFor example: jdbc:hive2://c1110-node4.coelab.cloudera.com:10000/ \e[21m\n "
+ echo -en "\e[96mPlease enter the JBDC URI for HiveServer2: \e[0m"
+ read "hs2jdbc"
+ hs2jdbcuri=$hs2jdbc
+
+   if ! [ -x "$(command -v hive)" ]; then
+   echo -e "\e[31mError: hiveclient is not installed.\e[0m"
+   echo -e "\e[96mPREREQ - 8. HIVE CHECK\e[0m Will not give expected results.\n \e[1mPlease Install Hive Client on this node\e[21m\n"
+   
+   
+   while true; do
+    read -p $'\n\e[96mDo You Still Wish to Proceed without (y/n) ? :\e[0m' yn
+    case $yn in
+        [Yy]* )  echo -e "\e[31mOK! Please note HIVE 3 has major changes !!! \e[0m" ; break;;
+        [Nn]* )  exit ; break;;
+        * ) echo "Please answer yes or no.";;
+    esac
+    done
+   
+   fi
+
+
 
 ############################################################################################################
 #
 #				 *******  TO CONFIGURE CONFIG.YAML *******
 ## Do not change the order of the section marked with *******
 ############################################################################################################
+
 
 hmsjdbc=$(curl -s -u $LOGIN:$PASSWORD --insecure $PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=HIVE | grep -w "javax.jdo.option.ConnectionURL" -A1 | tail -2 )
 hms_jdbc_uri=`echo $hmsjdbc | awk -F ',' '{print $1}' | awk -F '"' '{print $4}' | cut -d? -f1`
@@ -266,6 +293,9 @@ if [ ! -f $HIVECFG/hive-sre-shaded.jar ]; then
   wget -P $HIVECFG/ https://github.com/dstreev/cloudera_upgrade_utils/releases/download/2.0.4.0-SNAPSHOT/hive-sre-shaded.jar &>/dev/null
 fi
 
+## Exiting Hive check Loop
+fi
+
 echo -e "\e[35m########################################################\e[0m\n"
 
 ############################################################################################################
@@ -291,7 +321,7 @@ while true; do
 done
 #sh $SCRIPTDIR/ambaribkp.sh $AMBARI_HOST $BKP $today $REVIEW &> $LOGDIR/ambaribkp-$today.log &
 echo -e "Please check the logs in the file: \e[1m $LOGDIR/ambaribkp-$today.log \e[21m \n"
-echo -e "Backup of Ambari Datase, ambari.properties, and ambari-env.sh is available in:\e[1m $BKP \e[21m Directory\n"
+echo -e "Backup of Ambari Database, ambari.properties, and ambari-env.sh is available in:\e[1m $BKP \e[21m Directory\n"
 
 echo -e "\e[35m########################################################\e[0m\n"
 
@@ -437,6 +467,10 @@ echo -e "\e[35m########################################################\e[0m\n"
 # # hdfs dfs -setfacl -R -m user:root:rwx /
 # NEED TO ADD SUPPORT FOR KERBEROS
 ############################################################################################################
+if [ -z "$ishive" ]
+then
+echo -e "\e[31m Will Skip\e[0m \e[96mPREREQ - 8. HIVE CHECK\e[0m \e[31m as Hive is not Installed\e[0m"
+else
 echo -e "\e[96mPREREQ - 8. HIVE CHECK\e[0m \e[1mRunning Hive table check which includes:\e[21m  \n 1. Hive 3 Upgrade Checks - Locations Scan \n 2. Hive 3 Upgrade Checks - Bad ORC Filenames \n 3. Hive 3 Upgrade Checks - Managed Table Migrations ( Ownership check & Conversion to ACID tables) \n 4. Hive 3 Upgrade Checks - Compaction Check \n 5. Questionable Serde's Check \n 6. Managed Table Shadows \n"
 if  [ "$hms_dtype" == "mysql" ];then
 
@@ -461,9 +495,12 @@ fi
 sh $SCRIPTDIR/hiveprereq.sh $INTR/files/hive_databases.txt $HIVECFG  $REVIEW/hive  &> $LOGDIR/hivetablescan-$today.log &
 echo -e "Output is available in \e[1m $REVIEW/hive directory \e[21m"
 echo -e "Please check the logs in the file:\e[1m $LOGDIR/hivetablescan-$today.log   \e[21m\n"
-echo -e "\e[35m########################################################\e[0m\n"
 
 sleep 5
+
+fi
+
+echo -e "\e[35m########################################################\e[0m\n"
 
 ############################################################################################################
 #
