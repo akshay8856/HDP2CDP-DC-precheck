@@ -6,6 +6,16 @@ now=$3
 out=$4
 review=$5
 
+# This Stesp is to make sure scripts does not fail because of host key verification
+# Will backup the current known_hosts file in /$user-homedir/.ssh/known_hosts.old
+# Remove the host key for the specified host from /$useri-home-dir/.ssh/known_hosts.old
+ssh-keygen -R $AMBARIHOST
+
+# Will get the latest host key from the specified hosts
+ssh-keyscan $AMBARIHOST  >> ~/.ssh/known_hosts
+
+sleep 1
+
 echo -e "Taking backup of ambari.properties file at $BKPDIR/ambari.properties \n"
 ssh $AMBARIHOST cat /etc/ambari-server/conf/ambari.properties > $BKPDIR/ambari.properties 
 
