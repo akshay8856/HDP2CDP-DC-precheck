@@ -355,7 +355,7 @@ then
 echo -e "\n\e[32mRanger Is Not Installed, Skipping Ranger Database Backup\e[0m"
 else
 echo -e "\n\e[96mPREREQ - 3. Ranger Database \e[0m \e[1mTaking Backup of Ranger DB\e[21m"
-sh  $SCRIPTDIR/rangerdatabasebkp.sh $AMBARI_HOST $BKP $today $RANGERPASSWORD $PROTOCOL $LOGIN $PASSWORD $INTR $PORT &> $LOGDIR/rangerdatabasebkp-$today.log &
+sh  $SCRIPTDIR/rangerdatabasebkp.sh $AMBARI_HOST $cluster_name $today $RANGERPASSWORD $PROTOCOL $LOGIN $PASSWORD $INTR $PORT &> $LOGDIR/rangerdatabasebkp-$today.log &
 echo -e "\e[1mRanger_KMS DB back is available in: $BKP/rangerdbbkpi$today.sql \e[21m"
 echo -e "Please check the logs in the file: \e[1m$LOGDIR/rangerdatabasebkp-$today.log \e[21m  \n"
 fi
@@ -378,7 +378,7 @@ then
 echo -e "\n\e[32mRanger_KMS Is Not Installed, Skipping Ranger_KMS Database Backup\e[0m"
 else
 echo -e "\n\e[96mPREREQ - 4. Ranger_KMS Database \e[0m \e[1mTaking Backup of Ranger_KMS DB\e[21m"
-sh  $SCRIPTDIR/ranger_kmsdatabasebkp.sh $AMBARI_HOST $BKP $today $RANGER_KMS_PASSWORD $PROTOCOL $LOGIN $PASSWORD $INTR $PORT &> $LOGDIR/ranger_kms_databasebkp-$today.log &
+sh  $SCRIPTDIR/ranger_kmsdatabasebkp.sh $AMBARI_HOST $cluster_name $today $RANGER_KMS_PASSWORD $PROTOCOL $LOGIN $PASSWORD $INTR $PORT &> $LOGDIR/ranger_kms_databasebkp-$today.log &
 
 echo -e "\e[1mRanger_KMS DB back is available in: $BKP/ranger_kmsdbbkpi$today.sql \e[21m"
 echo -e "Please check the logs in the file: \e[1m$LOGDIR/ranger_kms_databasebkp-$today.log \e[21m  \n"
