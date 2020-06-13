@@ -14,11 +14,11 @@ ssh $AMBARIHOST cat  /var/lib/ambari-server/ambari-env.sh > $BKPDIR/ambari-env.s
 
 
 #server.jdbc.user.passwd=/etc/ambari-server/conf/password.dat
-ambaripwdfile=`grep -i server.jdbc.user.passw /tmp/ambari.properties | awk -F'=' '{print $2}'`
+ambaripwdfile=`grep -i server.jdbc.user.passw $BKPDIR/ambari.properties | awk -F'=' '{print $2}'`
 ambaridbpwd=`ssh $AMBARIHOST cat $ambaripwdfile`
-ambaridbtype=`grep -i server.jdbc.database= /tmp/ambari.properties | awk -F'=' '{print $2}'`
-ambariuser=`grep -i server.jdbc.user.name /tmp/ambari.properties | awk -F'=' '{print $2}'`
-ambaridb=`grep -i server.jdbc.database_name /tmp/ambari.properties | awk -F'=' '{print $2}'`
+ambaridbtype=`grep -i server.jdbc.database= $BKPDIR/ambari.properties | awk -F'=' '{print $2}'`
+ambariuser=`grep -i server.jdbc.user.name $BKPDIR/ambari.properties | awk -F'=' '{print $2}'`
+ambaridb=`grep -i server.jdbc.database_name $BKPDIR/ambari.properties | awk -F'=' '{print $2}'`
 
 echo -e "Checking if upgrade.parameter.nn-restart.timeout is configured in Ambari\n"
 echo -e "Checking if upgrade.parameter.nn-restart.timeout is configured in Ambari\n" >> $review/servicecheck/namenode-timeout-$now.out
