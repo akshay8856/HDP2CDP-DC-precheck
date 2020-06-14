@@ -227,6 +227,7 @@ else
 
 
 hmsjdbc=$(curl -s -u $LOGIN:$PASSWORD --insecure $PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=HIVE | grep -w "javax.jdo.option.ConnectionURL" -A1 | tail -2 )
+hive_database_name=$(curl -s -u admin:amankumbare --insecure http://172.25.41.64:8080/api/v1/clusters/c3110/configurations/service_config_versions?service_name=HIVE | grep hive_database_name | awk -F ':' '{print $2}' |  awk -F '"' '{print $2}' | tail -1 )
 hms_jdbc_uri=`echo $hmsjdbc | awk -F ',' '{print $1}' | awk -F '"' '{print $4}' | cut -d? -f1`
 hmsdb_user=`echo $hmsjdbc |  awk -F ',' '{print $2}' | awk -F ':' '{print $2}' | awk -F '"' '{print $2}'`
 hms_dtype=`echo $hms_jdbc_uri | awk -F ':' '{print $2}'`
@@ -479,6 +480,9 @@ if  [ "$hms_dtype" == "mysql" ];then
     hmsdbv=`echo $hmsraw | awk -F ' ' '{print $2}'`
     echo "HiveMetastore:$hms_dtype:$hmsdbv" >>  $INTR/files/DB-versioncheck-$today.out
  	
+ 	
+ 	echo -e "!!!! Taking Hive DB backup in $BKPDIR/Hivedbbkpi$today.sql  !!!! \n"
+    mysqldump -h $hms_dbhost -u $hmsdb_user -p$hms_dbpwd $hive_database_name > $INTR/backup/Hivedbbkpi$today.sql
 
 elif  [ "$hms_dtype" == "postgresql" ];then
 
@@ -486,6 +490,9 @@ elif  [ "$hms_dtype" == "postgresql" ];then
    hmsraw=`PGPASSWORD=$hms_dbpwd psql -h $hms_dbhost -U $hmsdb_user -c 'SHOW server_version;'`
    hmsdbv=`echo $kmsraw | awk '{print $3}'`
    echo "HiveMetastore:$hms_dtype:$hmsdbv" >> $INTR/files/DB-versioncheck-$today.out
+   
+   echo -e "!!!! Taking Hive DB backup in $BKPDIR/Hivedbbkpi$today.sql  !!!! \n"
+   PGPASSWORD=$hms_dbpwd  pg_dump -h $hms_dbhost -U $hmsdb_user $hive_database_name > $INTR/backup/Hivedbbkpi$today.sql
 
 else 
 
@@ -543,15 +550,15 @@ echo -e "\e[35m########################################################\e[0m\n"
 
 ############################################################################################################
 #
-# 					AMBARI VIEW  CHECK
+# 					AMBARI VIEW Check
 #
 ############################################################################################################
 
 echo -e "\e[96mPREREQ - 11. AMBARI VIEW \e[0m \e[1mChecking for Instances of Ambari Views which are removed as part of upgrade ?\e[21m "
 echo -e "\e[1m Initiating Ambari View Checks for required components\e[21m "
 
-sh $SCRIPTDIR/ambariview.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $PROTOCOL $INTR $today $REVIEW &> $LOGDIR/AmbariView-$today.log &
-echo -e "\e[1mOutput is available in the file: $REVIEW/servicecheck/-$today.out \e[21m"
+sh $SCRIPTDIR/ambariview.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $PROTOCOL $INTR $today $REVIEW  &> $LOGDIR/AmbariView-$today.log &
+echo -e "\e[1mOutput is available in the file: $REVIEW/servicecheck/ambariview-$today.out \e[21m"
 echo -e "\e[1mPlease check the logs in the file : $LOGDIR/AmbariView-$today.log  \e[21m"
 
 

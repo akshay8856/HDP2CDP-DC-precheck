@@ -6,7 +6,7 @@ CFG=$2
 OUTPUT=$3
 
 # Adding it for testing
-#kinit -kt /etc/security/keytabs/smokeuser.headless.keytab ambari-qa-c3110@COELAB.CLOUDERA.COM
+kinit -kt /etc/security/keytabs/smokeuser.headless.keytab ambari-qa-c3110@COELAB.CLOUDERA.COM
 
 hive -e 'show databases' > $db
 
