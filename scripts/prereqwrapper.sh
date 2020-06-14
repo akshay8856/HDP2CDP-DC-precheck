@@ -541,6 +541,19 @@ else
 fi
 echo -e "\e[35m########################################################\e[0m\n"
 
+############################################################################################################
+#
+# 					AMBARI VIEW  CHECK
+#
+############################################################################################################
+
+echo -e "\e[96mPREREQ - 11. AMBARI VIEW \e[0m \e[1mChecking for Instances of Ambari Views which are removed as part of upgrade ?\e[21m "
+echo -e "\e[1m Initiating Ambari View Checks for required components\e[21m "
+
+sh $SCRIPTDIR/ambariview.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $PROTOCOL $INTR $today $REVIEW &> $LOGDIR/AmbariView-$today.log &
+echo -e "\e[1mOutput is available in the file: $REVIEW/servicecheck/-$today.out \e[21m"
+echo -e "\e[1mPlease check the logs in the file : $LOGDIR/AmbariView-$today.log  \e[21m"
+
 
 ############################################################################################################
 #
@@ -552,7 +565,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 ############################################################################################################
 
 
-echo -e "\n\e[96mPREREQ - 11. OS & Service Check \e[0m  \e[1mChecking OS compatibility and running service check\e[21m"
+echo -e "\n\e[96mPREREQ - 12. OS & Service Check \e[0m  \e[1mChecking OS compatibility and running service check\e[21m"
 
 sh $SCRIPTDIR/run_all_service_check.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $REVIEW/os $REVIEW/servicecheck $today $INTR/files/ $PROTOCOL &> $LOGDIR/os-servicecheck-$today.log  &
 

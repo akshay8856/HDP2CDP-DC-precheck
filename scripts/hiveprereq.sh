@@ -3,14 +3,17 @@
 
 db=$1
 CFG=$2
+OUTPUT=$3
 
- hive -e 'show databases' > $db
+# Adding it for testing
+#kinit -kt /etc/security/keytabs/smokeuser.headless.keytab ambari-qa-c3110@COELAB.CLOUDERA.COM
+
+hive -e 'show databases' > $db
 
 if [ $? != 0 ]; then                   # last command: echo
   echo "Waiting to get list of all Databases"
 else
 
-OUTPUT=$3
 #cat hive_databases.txt | awk '{if(NR>4)print}' | grep -v "Time taken:" > dbs.txt
 DBS=`tr -s '\n ' ',' < $db`
 DBS=${DBS%,}
