@@ -48,7 +48,7 @@ To ease the launch of this script :
 2. Configure passwordless SSH access between edge node and Ambari to take backup of ambari.properties and ambari-env. 
 *Example Output:* If passwordless SSH cannot be configured you need to take backup of ambari.properties and ambari-env manually.
 
-3. Hive Client Must be Installed on this node
+3. Hive Client Must be Installed on the node where this script is executed
 
 4. For unsecured cluster : (This is required for Hive Pre Upgrade check)
 ```
@@ -62,11 +62,18 @@ To ease the launch of this script :
 - Set acl for root :
 $ hdfs dfs -setfacl -R -m user:root:r-x /
 
+- Execute the script prereqwrapper.sh
+
 ```
 
 5. For Secured Cluster : (This is required for Hive Pre Upgrade check)
 ```
-Will update shortly...
+ - Give user readonly permission to all paths in HDFS in Ranger
+ - As root user get kerberos ticket for the user for which you created policy 
+ $ kinit user@realmname
+ $ klist 
+
+- Execute the script prereqwrapper.s 
 ```
 
 ### How to execute ?
