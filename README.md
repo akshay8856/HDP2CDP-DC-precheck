@@ -29,7 +29,7 @@ The intent is to save the time required to prepare and perform upgrade.
 
 * Ambari Managed Keytabs and krb5.conf
 
-* OS Compatibility & SERVICE CHECK
+* OS Compatibility & Service Check
 
 ### To Add 
 
