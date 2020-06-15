@@ -139,7 +139,7 @@ fi
 # Do not change the order of the section marked with *******
 ############################################################################################################
 
-INTR=/upgrade
+INTR=/HDP2CDP-DC-precheck
 HIVECFG=$INTR/hivechecks
 SCRIPTDIR=$INTR/scripts
 REVIEW=$INTR/review
@@ -601,20 +601,20 @@ ssh-keyscan $AMBARI_HOST  >> ~/.ssh/known_hosts
 	sleep 2
 
 ismanagedkrb5=`ssh $AMBARI_HOST /var/lib/ambari-server/resources/scripts/configs.py --port=$PORT --action=get --host=$AMBARI_HOST --cluster=$cluster_name --config-type=krb5-conf --user=$LOGIN --password=$PASSWORD | grep manage_krb5_conf | awk -F ':' '{print $2}' | awk -F '"' '{print $2}'`
-ismanagedkeytab=`ssh $AMBARI_HOST /var/lib/ambari-server/resources/scripts/configs.py --port=$PORT --action=get --host=$AMBARI_HOST --cluster=$cluster_name --config-type=krb5-conf --user=$LOGIN --password=$PASSWORD | grep manage_identities | awk -F ':' '{print $2}' | awk -F '"' '{print $2}'`
+ismanagedkeytab=`ssh $AMBARI_HOST /var/lib/ambari-server/resources/scripts/configs.py --port=$PORT --action=get --host=$AMBARI_HOST --cluster=$cluster_name --config-type=kerberos-env --user=$LOGIN --password=$PASSWORD | grep manage_identities | awk -F ':' '{print $2}' | awk -F '"' '{print $2}'`
 
 	if [[  "$ismanagedkeytab" == "true" &&  "$ismanagedkrb5" == "true" ]]; then
-		echo -e "\e[32m Kerberos Keytabs $ Krb5 is Managed By Ambari \n\e[0m"
-		echo -e "\e[32m Kerberos Keytabs $ Krb5 is Managed By Ambari \n\e[0m" >> $REVIEW/servicecheck/KerberoCheck-$today.out
+		echo -e "\e[32m Kerberos Keytabs & Krb5 is Managed By Ambari \n\e[0m"
+		echo -e "\e[32m Kerberos Keytabs & Krb5 is Managed By Ambari \n\e[0m" >> $REVIEW/servicecheck/KerberoCheck-$today.out
 
 
 	elif [[ "$ismanagedkeytab" != "true"  && "$ismanagedkrb5" != "true" ]]; then
 
-		echo -e "\e[31m Kerberos Keytabs $ Krb5 are NOT Managed By Ambari\e[21m"
-		echo -e "\e[31m It is recommended to manage Kerberos Keytabs $ Krb5 using Ambari before upgrade\n\e[21m \e[1mPlease consult Cloudera team for advice\e[0m"
+		echo -e "\e[31m Kerberos Keytabs & Krb5 are NOT Managed By Ambari\e[21m"
+		echo -e "\e[31m It is recommended to manage Kerberos Keytabs & Krb5 using Ambari before upgrade\n\e[21m \e[1mPlease consult Cloudera team for advice\e[0m"
 		
-		echo -e "\e[31m Kerberos Keytabs $ Krb5 are NOT Managed By Ambari\e[21m" >> $REVIEW/servicecheck/KerberoCheck-$today.out
-		echo -e "\e[31m It is recommended to manage Kerberos Keytabs $ Krb5 using Ambari before upgrade\n\e[21m \e[1mPlease consult Cloudera team for advice\e[0m" >> $REVIEW/servicecheck/KerberoCheck-$today.out
+		echo -e "\e[31m Kerberos Keytabs & Krb5 are NOT Managed By Ambari\e[21m" >> $REVIEW/servicecheck/KerberoCheck-$today.out
+		echo -e "\e[31m It is recommended to manage Kerberos Keytabs & Krb5 using Ambari before upgrade\n\e[21m \e[1mPlease consult Cloudera team for advice\e[0m" >> $REVIEW/servicecheck/KerberoCheck-$today.out
 
 	elif [[ "$ismanagedkeytab" != "true" &&  "$ismanagedkrb5" == "true" ]]; then
 
