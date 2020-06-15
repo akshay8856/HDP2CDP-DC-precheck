@@ -13,6 +13,8 @@ The intent is to save the time required to prepare and perform upgrade.
 
 * RangerKMS Database Backup
 
+* Oozie Database Backup
+
 * Deprecated Components
 
 * HDF Mpack
