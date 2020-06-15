@@ -330,26 +330,29 @@ echo -e "\e[96mPREREQ - 1. Ambari Backup :\e[0m  \e[1m Ambari Backup and Config\
 while true; do
     read -p $'\e[96mWe will need to start and stop Ambari. Please confirm if we should proceed (y/n) ? :\e[0m' yn
     case $yn in
-        [Yy]* ) sh $SCRIPTDIR/ambaribkp.sh $AMBARI_HOST $BKP $today $INTR $REVIEW &> $LOGDIR/ambaribkp-$today.log & break;;
-        [Nn]* ) exit;;
+        [Yy]* ) sh $SCRIPTDIR/ambaribkp.sh $AMBARI_HOST $BKP $today $INTR $REVIEW &> $LOGDIR/ambaribkp-$today.log & 
+				#sh $SCRIPTDIR/ambaribkp.sh $AMBARI_HOST $BKP $today $REVIEW &> $LOGDIR/ambaribkp-$today.log &
+				echo -e "Please check the logs in the file: \e[1m $LOGDIR/ambaribkp-$today.log \e[21m \n"
+				echo -e "Backup of Ambari Database, ambari.properties, and ambari-env.sh is available in:\e[1m $BKP \e[21m Directory\n"
+
+		        echo -e "\e[35m########################################################\e[0m\n"
+
+				echo -e "\n\e[96mPREREQ - 2. Namenode Upgrade Timeout Check \e[0m"
+				echo -e "\e[1mOutput is available in the file: $REVIEW/servicecheck/namenode-timeout-$today.out \e[21m"
+
+				echo -e "\e[35m########################################################\e[0m\n"
+				# Need to allow some time for Ambari to start and get heatbeats from all agents.
+				# Increase time for large clusters
+				echo -e "\e[1mWaiting for a minute for Ambari to Start & receive heatbeats from all agents\e[21m"
+				# Increase time for large clusters
+				sleep 60  
+				break;;
+        [Nn]* ) echo "Okay !! We will skip backup of Ambari Database, ambari.properties and ambari-env " 
+        		break;;
         * ) echo "Please answer yes or no.";;
     esac
 done
-#sh $SCRIPTDIR/ambaribkp.sh $AMBARI_HOST $BKP $today $REVIEW &> $LOGDIR/ambaribkp-$today.log &
-echo -e "Please check the logs in the file: \e[1m $LOGDIR/ambaribkp-$today.log \e[21m \n"
-echo -e "Backup of Ambari Database, ambari.properties, and ambari-env.sh is available in:\e[1m $BKP \e[21m Directory\n"
 
-echo -e "\e[35m########################################################\e[0m\n"
-
-echo -e "\n\e[96mPREREQ - 2. Namenode Upgrade Timeout Check \e[0m"
-echo -e "\e[1mOutput is available in the file: $REVIEW/servicecheck/namenode-timeout-$today.out \e[21m"
-
-echo -e "\e[35m########################################################\e[0m\n"
-# Need to allow some time for Ambari to start and get heatbeats from all agents.
-# Increase time for large clusters
-echo -e "\e[1mWaiting for a minute for Ambari to Start & receive heatbeats from all agents\e[21m"
-# Increase time for large clusters
-sleep 60
 
 echo -e "\e[35m########################################################\e[0m\n"
 
@@ -590,18 +593,23 @@ else
 	echo -e "\e[96mPREREQ - 12. KERBEROS CHECK \e[0m \e[1mChecking If Keytab & Krb5.conf is managed by Ambari? \e[21m "
 	echo -e "\e[1m Initiating Kerberos check for managed keytabs and krb5.conf \e[21m "
 
+
+latestconfig=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=KERBEROS" | grep service_config_version= | awk -F ' : ' '{print $2}' |  awk -F '"' '{print $2}' | tail -1)
+ismanagedkeytab=$(curl -s -u $LOGIN:$PASSWORD --insecure "$latestconfig" | grep manage_identities | awk -F ':' '{print $2}' | awk -F '"' '{print $2}')
+ismanagedkrb5=$(curl -s -u $LOGIN:$PASSWORD --insecure "$latestconfig" | grep manage_krb5_conf | awk -F ':' '{print $2}' | awk -F '"' '{print $2}')
+
 # This Step is to make sure scripts does not fail because of host key verification
 # Will backup the current known_hosts file in /$user-homedir/.ssh/known_hosts.old
 # Remove the host key for the specified host from /$useri-home-dir/.ssh/known_hosts.old
-ssh-keygen -R $AMBARI_HOST
+#ssh-keygen -R $AMBARI_HOST
 
 # Will get the latest host key from the specified hosts
-ssh-keyscan $AMBARI_HOST  >> ~/.ssh/known_hosts 
+#ssh-keyscan $AMBARI_HOST  >> ~/.ssh/known_hosts 
+#sleep 2
 
-	sleep 2
 
-ismanagedkrb5=`ssh $AMBARI_HOST /var/lib/ambari-server/resources/scripts/configs.py --port=$PORT --action=get --host=$AMBARI_HOST --cluster=$cluster_name --config-type=krb5-conf --user=$LOGIN --password=$PASSWORD | grep manage_krb5_conf | awk -F ':' '{print $2}' | awk -F '"' '{print $2}'`
-ismanagedkeytab=`ssh $AMBARI_HOST /var/lib/ambari-server/resources/scripts/configs.py --port=$PORT --action=get --host=$AMBARI_HOST --cluster=$cluster_name --config-type=kerberos-env --user=$LOGIN --password=$PASSWORD | grep manage_identities | awk -F ':' '{print $2}' | awk -F '"' '{print $2}'`
+#ismanagedkrb5=`ssh $AMBARI_HOST /var/lib/ambari-server/resources/scripts/configs.py --port=$PORT --action=get --host=$AMBARI_HOST --cluster=$cluster_name --config-type=krb5-conf --user=$LOGIN --password=$PASSWORD | grep manage_krb5_conf | awk -F ':' '{print $2}' | awk -F '"' '{print $2}'`
+#ismanagedkeytab=`ssh $AMBARI_HOST /var/lib/ambari-server/resources/scripts/configs.py --port=$PORT --action=get --host=$AMBARI_HOST --cluster=$cluster_name --config-type=kerberos-env --user=$LOGIN --password=$PASSWORD | grep manage_identities | awk -F ':' '{print $2}' | awk -F '"' '{print $2}'`
 
 	if [[  "$ismanagedkeytab" == "true" &&  "$ismanagedkrb5" == "true" ]]; then
 		echo -e "\e[32m Kerberos Keytabs & Krb5 is Managed By Ambari \n\e[0m"
@@ -642,7 +650,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 
 ############################################################################################################
 #
-# 					CHECKING THE LIST OF SERVICES TO BE REMOVED
+# 					 OS & SSERVICE CHECK
 #
 # 1. Check OS compatibility on all Nodes : ONLY MAJOR VERSION (limitation because of Ambari API)
 # 2. If want to check minor version need to configure a different script
