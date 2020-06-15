@@ -68,6 +68,17 @@ if ! [ -x "$(command -v wget)" ]; then
   echo -e "\e[31mError: wget is not installed.\e[0m"
   exit 1
 fi
+
+if ! [ -x "$(command -v ssh-keygen)" ]; then
+  echo -e "\e[31mError: ssh-keygen is not installed.\e[0m"
+  exit 1
+fi
+
+if ! [ -x "$(command -v ssh-keyscan)" ]; then
+  echo -e "\e[31mError: ssh-keyscan is not installed.\e[0m"
+  exit 1
+fi
+
 ############################################################################################################
 #
 #				*******	COLLECTING AMBARI DETAILS *******
@@ -128,7 +139,7 @@ fi
 # Do not change the order of the section marked with *******
 ############################################################################################################
 
-INTR=/HDP2CDP-DC-precheck
+INTR=/upgrade
 HIVECFG=$INTR/hivechecks
 SCRIPTDIR=$INTR/scripts
 REVIEW=$INTR/review
@@ -164,6 +175,10 @@ echo -e "\e[35m########################################################\e[0m\n"
 isranger=`grep -w "RANGER" $INTR/files/services.txt`
 israngerkms=`grep -w "RANGER_KMS" $INTR/files/services.txt`
 ishive=`grep -w "HIVE" $INTR/files/services.txt`
+iskerberos=`grep -w "KERBEROS" $INTR/files/services.txt`
+#isatlas
+#isoozie
+
 
 if [ -z "$isranger" ]
 then
@@ -481,7 +496,7 @@ if  [ "$hms_dtype" == "mysql" ];then
     echo "HiveMetastore:$hms_dtype:$hmsdbv" >>  $INTR/files/DB-versioncheck-$today.out
  	
  	
- 	echo -e "!!!! Taking Hive DB backup in $BKPDIR/Hivedbbkpi$today.sql  !!!! \n"
+ 	echo -e "!!!! Taking Hive DB backup in $INTR/backup/Hivedbbkpi$today.sql  !!!! \n"
     mysqldump -h $hms_dbhost -u $hmsdb_user -p$hms_dbpwd $hive_database_name > $INTR/backup/Hivedbbkpi$today.sql
 
 elif  [ "$hms_dtype" == "postgresql" ];then
@@ -491,7 +506,7 @@ elif  [ "$hms_dtype" == "postgresql" ];then
    hmsdbv=`echo $kmsraw | awk '{print $3}'`
    echo "HiveMetastore:$hms_dtype:$hmsdbv" >> $INTR/files/DB-versioncheck-$today.out
    
-   echo -e "!!!! Taking Hive DB backup in $BKPDIR/Hivedbbkpi$today.sql  !!!! \n"
+   echo -e "!!!! Taking Hive DB backup in $INTR/backup/Hivedbbkpi$today.sql  !!!! \n"
    PGPASSWORD=$hms_dbpwd  pg_dump -h $hms_dbhost -U $hmsdb_user $hive_database_name > $INTR/backup/Hivedbbkpi$today.sql
 
 else 
@@ -561,6 +576,69 @@ sh $SCRIPTDIR/ambariview.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $PROTOCOL $INTR 
 echo -e "\e[1mOutput is available in the file: $REVIEW/servicecheck/ambariview-$today.out \e[21m"
 echo -e "\e[1mPlease check the logs in the file : $LOGDIR/AmbariView-$today.log  \e[21m"
 
+echo -e "\e[35m########################################################\e[0m\n"
+
+
+############################################################################################################
+#
+# 					CHECK IF KEYTABS & KRB5.CONF ARE NOT MANAGED BY AMBARI
+#
+############################################################################################################
+if [ -z "$iskerberos" ];then
+echo -e "\e[1mKerberos is not enabled on $cluster_name. Skipping \e[21m \e[96mPREREQ - 12. KERBEROS CHECK \e[0m"
+else
+	echo -e "\e[96mPREREQ - 12. KERBEROS CHECK \e[0m \e[1mChecking If Keytab & Krb5.conf is managed by Ambari? \e[21m "
+	echo -e "\e[1m Initiating Kerberos check for managed keytabs and krb5.conf \e[21m "
+
+# This Step is to make sure scripts does not fail because of host key verification
+# Will backup the current known_hosts file in /$user-homedir/.ssh/known_hosts.old
+# Remove the host key for the specified host from /$useri-home-dir/.ssh/known_hosts.old
+ssh-keygen -R $AMBARI_HOST
+
+# Will get the latest host key from the specified hosts
+ssh-keyscan $AMBARI_HOST  >> ~/.ssh/known_hosts 
+
+	sleep 2
+
+ismanagedkrb5=`ssh $AMBARI_HOST /var/lib/ambari-server/resources/scripts/configs.py --port=$PORT --action=get --host=$AMBARI_HOST --cluster=$cluster_name --config-type=krb5-conf --user=$LOGIN --password=$PASSWORD | grep manage_krb5_conf | awk -F ':' '{print $2}' | awk -F '"' '{print $2}'`
+ismanagedkeytab=`ssh $AMBARI_HOST /var/lib/ambari-server/resources/scripts/configs.py --port=$PORT --action=get --host=$AMBARI_HOST --cluster=$cluster_name --config-type=krb5-conf --user=$LOGIN --password=$PASSWORD | grep manage_identities | awk -F ':' '{print $2}' | awk -F '"' '{print $2}'`
+
+	if [[  "$ismanagedkeytab" == "true" &&  "$ismanagedkrb5" == "true" ]]; then
+		echo -e "\e[32m Kerberos Keytabs $ Krb5 is Managed By Ambari \n\e[0m"
+		echo -e "\e[32m Kerberos Keytabs $ Krb5 is Managed By Ambari \n\e[0m" >> $REVIEW/servicecheck/KerberoCheck-$today.out
+
+
+	elif [[ "$ismanagedkeytab" != "true"  && "$ismanagedkrb5" != "true" ]]; then
+
+		echo -e "\e[31m Kerberos Keytabs $ Krb5 are NOT Managed By Ambari\e[21m"
+		echo -e "\e[31m It is recommended to manage Kerberos Keytabs $ Krb5 using Ambari before upgrade\n\e[21m \e[1mPlease consult Cloudera team for advice\e[0m"
+		
+		echo -e "\e[31m Kerberos Keytabs $ Krb5 are NOT Managed By Ambari\e[21m" >> $REVIEW/servicecheck/KerberoCheck-$today.out
+		echo -e "\e[31m It is recommended to manage Kerberos Keytabs $ Krb5 using Ambari before upgrade\n\e[21m \e[1mPlease consult Cloudera team for advice\e[0m" >> $REVIEW/servicecheck/KerberoCheck-$today.out
+
+	elif [[ "$ismanagedkeytab" != "true" &&  "$ismanagedkrb5" == "true" ]]; then
+
+		echo -e "\e[31m Kerberos Keytabs are NOT Managed By Ambari\e[21m"
+		echo -e "\e[31m It is recommended to manage Kerberos Keytabs using Ambari before upgrade.\n\e[21m \e[1mPlease consult Cloudera team for advice\e[0m"
+		
+		echo -e "\e[31m Kerberos Keytabs are NOT Managed By Ambari\e[21m" >> $REVIEW/servicecheck/KerberoCheck-$today.out
+		echo -e "\e[31m It is recommended to manage Kerberos Keytabs using Ambari before upgrade.\n\e[21m \e[1mPlease consult Cloudera team for advice\e[0m" >> $REVIEW/servicecheck/KerberoCheck-$today.out
+
+	else
+
+		echo -e "\e[31m Kerberos Krb5.conf is NOT Managed By Ambari\e[21m"
+		echo -e "\e[31m It is recommended to manage Kerberos krb5.conf using Ambari before upgrade.\n\e[21m \e[1mPlease consult Cloudera team for advice\e[0m"
+		
+		echo -e "\e[31m Kerberos Krb5.conf is NOT Managed By Ambari\e[21m"  >> $REVIEW/servicecheck/KerberoCheck-$today.out
+		echo -e "\e[31m It is recommended to manage Kerberos krb5.conf using Ambari before upgrade.\n\e[21m \e[1mPlease consult Cloudera team for advice\e[0m"  >> $REVIEW/servicecheck/KerberoCheck-$today.out
+
+	fi
+
+echo -e "\e[1mOutput is available in the file: $REVIEW/servicecheck/KerberoCheck-$today.out \e[21m"
+fi
+
+echo -e "\e[35m########################################################\e[0m\n"
+
 
 ############################################################################################################
 #
@@ -572,7 +650,7 @@ echo -e "\e[1mPlease check the logs in the file : $LOGDIR/AmbariView-$today.log 
 ############################################################################################################
 
 
-echo -e "\n\e[96mPREREQ - 12. OS & Service Check \e[0m  \e[1mChecking OS compatibility and running service check\e[21m"
+echo -e "\n\e[96mPREREQ - 13. OS & Service Check \e[0m  \e[1mChecking OS compatibility and running service check\e[21m"
 
 sh $SCRIPTDIR/run_all_service_check.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $REVIEW/os $REVIEW/servicecheck $today $INTR/files/ $PROTOCOL &> $LOGDIR/os-servicecheck-$today.log  &
 
