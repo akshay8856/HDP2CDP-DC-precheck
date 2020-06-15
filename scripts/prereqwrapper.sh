@@ -20,12 +20,14 @@ echo -e "\e[35m########################################################\e[0m\n"
 echo -e "\e[96mPlease confirm if you have met following prerequisites :\e[0m\n"
 echo -e "0. You should have root access on this node"
 echo -e "1. Hive Client Must be Installed on this node"
-echo -e "2. Password less SSH Must be configured from this node"
-echo -e "3. You have Ambari details handy : Username, Password, Host, Port"
-echo -e "4. You have ranger database password handby with you"
-echo -e "5. You able to login to the ranger database from this node"
-echo -e "6. You are able to connect using beeline. Keep JDBC string handy with you"
-echo -e "7. You are able to connect to HiveMetastor DB from this node"
+echo -e "2. Configure passwordless SSH access between edge node and Ambari to take backup of ambari.properties and ambari-env.\nIf passwordless SSH cannot be configured you need to take backup of ambari.properties and ambari-env manually."
+echo -e "3. Need Ambari details : Username, Password, Host, Port"
+echo -e "4. Need Ranger, RangerKMS, HiveMetastore and Oozie database password"
+echo -e "5. Configure access to Ambari, Ranger, RangerKMS, HiveMetastore and Oozie database from this node"
+echo -e "6. For unsecured cluster :\n- Create home directory for root user in hdfs\n$ su - hdfs\n$ mkdir /user/root\n$ hdfs dfs -chown root:root /user/root\n- Enable acls for hdfs by configuring dfs.namenode.acls.enabled=true in custom hdfs-site.xml. Restart required services\n-Set acl for root :\n$ hdfs dfs -setfacl -R -m user:root:r-x /\n"
+echo -e "7. For secured cluster:\n- Give user readonly permission to all paths in HDFS in Ranger\n- As root user get kerberos ticket for the user for which you created policy\n$ kinit user@realmname\n$ klist"
+
+
 
 while true; do
     read -p $'\e[96mPlease confirm if you have met all above prerequisites (y/n) ? :\e[0m' yn
@@ -496,7 +498,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 ############################################################################################################
 echo -e "\e[96mPREREQ - 7. Third Party \e[0m \e[1mThird Party Services to be deleted before upgrade\e[21m"
 
-thirdparty=`egrep -vi "AMBARI_INFRA|AMBARI_METRICS|ATLAS|FLUME|HBASE|HDFS|HIVE|KAFKA|MAPREDUCE2|PIG|RANGER|RANGER_KMS|SLIDER|SMARTSENSE|SPARK|SPARK2|SQOOP|TEZ|YARN|ZOOKEEPER|NIFI|NIFI_REGISTRY|REGISTRY|STREAMLINE|KERBEROS|KNOX|ACCUMULO|DRUID|MAHOUT|STORM|LOGSEARCH|SUPERSET" $INTR/files/services.txt | grep -v -i spark2 | tr -s '\n ' ','`
+thirdparty=`egrep -vi "AMBARI_INFRA|LOGSEARCH|AMBARI_METRICS|ATLAS|FLUME|HBASE|HDFS|HIVE|KAFKA|MAPREDUCE2|PIG|RANGER|RANGER_KMS|SLIDER|SMARTSENSE|SPARK|SPARK2|SQOOP|TEZ|YARN|ZOOKEEPER|NIFI|NIFI_REGISTRY|REGISTRY|STREAMLINE|KERBEROS|KNOX|ACCUMULO|DRUID|MAHOUT|STORM|LOGSEARCH|SUPERSET" $INTR/files/services.txt | grep -v -i spark2 | tr -s '\n ' ','`
 thirdparty=${thirdparty%,}
 
 if [ -z "$thirdparty" ];then

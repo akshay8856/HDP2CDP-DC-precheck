@@ -72,7 +72,7 @@ $ hdfs dfs -setfacl -R -m user:root:r-x /
  $ kinit user@realmname
  $ klist 
 
-- Execute the script prereqwrapper.s 
+- Execute the script prereqwrapper.sh 
 ```
 
 ### How to execute ?
