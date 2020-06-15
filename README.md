@@ -35,11 +35,9 @@ The intent is to save the time required to prepare and perform upgrade.
 
 ### To Add 
 
-1. Oozie Database backup
 
-2. Atlas backup
-
-3. SSL (TBD)
+* Atlas backup
+*  SSL (TBD)
 
 ### Environment Settings
 
