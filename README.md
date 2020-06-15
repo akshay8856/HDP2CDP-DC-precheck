@@ -45,8 +45,7 @@ To ease the launch of this script :
 
 1. Configure access to Ambari, Ranger, RangerKMS, HiveMetastore and Oozie database.
 
-2. Configure passwordless SSH access between edge node and Ambari to take backup of ambari.properties and ambari-env. 
-*Example Output:* If passwordless SSH cannot be configured you need to take backup of ambari.properties and ambari-env manually.
+2. Configure passwordless SSH access between edge node and Ambari to take backup of ambari.properties and ambari-env. If passwordless SSH cannot be configured you need to take backup of ambari.properties and ambari-env manually.
 
 3. Hive Client Must be Installed on the node where this script is executed
 
