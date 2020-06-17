@@ -46,7 +46,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 ############################################################################################################
 if ! [ -x "$(command -v mysqldump)" ]; then
   echo -e "\e[31mError: mysqldump is not installed.\e[0m"
-  echo -e "\e[31mPlease install mysql-community-client package\e[0m"
+  echo -e "\e[31mPlease install mysql package\e[0m"
   exit 1
 fi
 
@@ -360,7 +360,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 #
 # 			********* BACKPUP : Ambari-DB / ambari.properites / ambari-env.sh *******
 #
-# 1. Password less ssh is must
+# 1. Password less ssh for ambari.properites / ambari-env.sh 
 # 2. works with PGSQL and MYSQL
 # 3. Need to test to for mariadb and oracle
 # 4. Flow: Backup ambari.properties , ambari-env.sh | Stop Ambari | Backup Database | Start Ambari
@@ -413,7 +413,8 @@ isranger=${isranger%,}
 
 if [ -z "$isranger" ]
 then
-echo -e "\n\e[32mRanger Is Not Installed, Skipping Ranger Database Backup\e[0m"
+echo -e "\n\e[32mRanger Is Not Installed, Skipping \e[0m \e[96mPREREQ - 2. Ranger Database Backup\e[0m"
+
 else
 echo -e "\n\e[96mPREREQ -2. Ranger Database \e[0m \e[1mTaking Backup of Ranger DB\e[21m"
 sh  $SCRIPTDIR/rangerdatabasebkp.sh $AMBARI_HOST $cluster_name $today $RANGERPASSWORD $PROTOCOL $LOGIN $PASSWORD $INTR $PORT &> $LOGDIR/rangerdatabasebkp-$today.log &
@@ -436,7 +437,7 @@ israngerkms=${israngerkms%,}
 
 if [ -z "$israngerkms" ]
 then
-echo -e "\n\e[32mRanger_KMS Is Not Installed, Skipping Ranger_KMS Database Backup\e[0m"
+echo -e "\n\e[32mRanger_KMS Is Not Installed, Skipping \e[0m \e[96mPREREQ - 3. Ranger_KMS Database Backup\e[0m"
 else
 echo -e "\n\e[96mPREREQ - 3. Ranger_KMS Database \e[0m \e[1mTaking Backup of Ranger_KMS DB\e[21m"
 sh  $SCRIPTDIR/ranger_kmsdatabasebkp.sh $AMBARI_HOST $cluster_name $today $RANGER_KMS_PASSWORD $PROTOCOL $LOGIN $PASSWORD $INTR $PORT &> $LOGDIR/ranger_kms_databasebkp-$today.log &
@@ -460,7 +461,8 @@ isoozie=${isoozie%,}
 
 if [ -z "$isoozie" ]
 then
-echo -e "\n\e[32mOozie Is Not Installed, Skipping Oozie Database Backup\e[0m"
+echo -e "\n\e[32mOozie Is Not Installed, Skipping \e[0m \e[96mPREREQ - 4. Oozie Database Backup\e[0m"
+
 else
 echo -e "\n\e[96mPREREQ - 4. Oozie Database \e[0m \e[1mTaking Backup of Oozie DB\e[21m"
 sh -x $SCRIPTDIR/ooziedb.sh $AMBARI_HOST $cluster_name $today $OOZIE_PASSWORD $PROTOCOL $LOGIN $PASSWORD $INTR $PORT &> $LOGDIR/oozie_databasebkp-$today.log &
@@ -554,7 +556,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 ############################################################################################################
 if [ -z "$ishive" ]
 then
-echo -e "\e[31m Will Skip\e[0m \e[96mPREREQ - 8. HIVE CHECK\e[0m \e[31m as Hive is not Installed\e[0m"
+echo -e "\e[32m Will Skip\e[0m \e[96mPREREQ - 8. HIVE CHECK\e[0m \e[31m as Hive is not Installed\e[0m"
 else
 echo -e "\e[96mPREREQ - 8. HIVE CHECK\e[0m \e[1mRunning Hive table check which includes:\e[21m  \n 1. Hive 3 Upgrade Checks - Locations Scan \n 2. Hive 3 Upgrade Checks - Bad ORC Filenames \n 3. Hive 3 Upgrade Checks - Managed Table Migrations ( Ownership check & Conversion to ACID tables) \n 4. Hive 3 Upgrade Checks - Compaction Check \n 5. Questionable Serde's Check \n 6. Managed Table Shadows \n"
 if  [ "$hms_dtype" == "mysql" ];then
@@ -570,7 +572,7 @@ if  [ "$hms_dtype" == "mysql" ];then
 
 elif  [ "$hms_dtype" == "postgresql" ];then
 
-   echo -e "\e[1m!!!! Checking HiveMetastore Database Version!!!\e[21m"
+   echo -e "\e[1mChecking HiveMetastore Database Version!!!\e[21m"
    hmsraw=`PGPASSWORD=$hms_dbpwd psql -h $hms_dbhost -U $hmsdb_user -c 'SHOW server_version;'`
    hmsdbv=`echo $kmsraw | awk '{print $3}'`
    echo "HiveMetastore:$hms_dtype:$hmsdbv" >> $INTR/files/DB-versioncheck-$today.out
@@ -602,7 +604,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 ############################################################################################################
 if [ -z "$isatlas" ]
 then
-echo -e "\e[31m Will Skip\e[0m \e[96mPREREQ - 9. ATLAS BACKUP\e[0m \e[31m as atlas is not Installed\e[0m"
+echo -e "\n\e[32mAtlas Is Not Installed, Skipping Skipping\e[0m \e[96mPREREQ - 9. ATLAS BACKUP \e[0m"
 else
 echo -e "\e[96mPREREQ - 9. ATLAS BACKUP\e[0m \e[1mRunning Atlas Backup:\e[21m  \n 1. Hbase table backup \n 2. Shard backup \n"
 
@@ -678,7 +680,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 #
 ############################################################################################################
 if [ -z "$iskerberos" ];then
-echo -e "\e[1mKerberos is not enabled on $cluster_name. Skipping \e[21m \e[96mPREREQ - 13. KERBEROS CHECK \e[0m"
+echo -e "\e[32mKerberos is not enabled on $cluster_name. Skipping\e[0m \e[96mPREREQ - 13. KERBEROS CHECK \e[0m"
 else
 	echo -e "\e[96mPREREQ - 13. KERBEROS CHECK \e[0m \e[1mChecking If Keytab & Krb5.conf is managed by Ambari? \e[21m "
 	echo -e "\e[1m Initiating Kerberos check for managed keytabs and krb5.conf \e[21m "
