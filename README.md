@@ -1,3 +1,4 @@
+
 ## HDP2.6 To CDP-DC Preupgrade Checks
 
 This tool is to help customers to prepare and plan for upgrade from HDP to CDP-DC. Helps to get details on what actions are required before upgrading the HDP 2.x clusters.
@@ -47,7 +48,7 @@ To ease the launch of this script :
 
 2. Configure passwordless SSH access between edge node and Ambari to take backup of ambari.properties and ambari-env. If passwordless SSH cannot be configured you need to take backup of ambari.properties and ambari-env manually.
 
-3. Hive Client Must be Installed on the node where this script is executed
+3. Hive, HDFS and Hbase Client Must be Installed on the node where this script is executed
 
 4. For unsecured cluster : (This is required for Hive Pre Upgrade check)
 ```
@@ -94,3 +95,5 @@ $ sh /HDP2CDP-DC-precheck/scripts/prereqwrapper.sh
 
 *Example Output:* I am still working on creating a consolidated view of the output to make it user friendly
 
+
+![image] (https://user-images.githubusercontent.com/22625721/84717285-51fc3280-af6d-11ea-8042-858448a4a329.png)
