@@ -27,13 +27,15 @@ do
 curl -s -u $LOGIN:$PASSWORD --insecure $line | grep href | grep version | awk -F '"' '{print $4}' >> $intr/files/viewversion-$now.txt
 done < "$intr/files/views-$now.txt"
 
+echo -e "Please remove below views before upgrade:\n"
 echo "COMPONENT	      VIEW-INSTANCE"  > $review/servicecheck/ambariview-$now.out
+
 while IFS= read -r line
 do
 curl -s -u $LOGIN:$PASSWORD --insecure $line/instances | grep href | awk -F '"' '{print $4}' | grep -w "$line/instances/.*" | awk -F '/' '{{OFS = "\t"}; print $7, $11}' >> $review/servicecheck/ambariview-$now.out
 
 done < "$intr/files/viewversion-$now.txt"
 
-
+echo -e "\nPlease refer https://docs.cloudera.com/cdp/latest/upgrade-hdp/topics/amb-changes-services-views.html for more information""
 
 

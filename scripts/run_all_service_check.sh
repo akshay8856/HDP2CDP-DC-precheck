@@ -44,6 +44,7 @@ fi
 
 done < $intr/hosts.txt
 
+echo -e "\nPlease refer "https://docs.cloudera.com/cloudera-manager/7.1.1/installation/topics/cdpdc-os-requirements.html" for further details" >> $OSOUT/oscheck-$date.out
 echo -e "\nOS compatibility check completed for$cluster_name. \n please check the output in $OSOUT/oscheck-$date.out"
 # OS version check COMPLETED !!!!!
 

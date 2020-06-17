@@ -29,8 +29,8 @@ if [ "$(printf '%s\n' "$requiredver" "$currentver" | sort -V | head -n1)" = "$re
         echo -e  "Database for $component: $db_type-$currentver is compatible for upgrade to CDP-DC\n"
         echo -e  "Database for $component: $db_type-$currentver is compatible for upgrade to CDP-DC\n" >> $out
  else
-        echo -e "Databse for $component: $db_type-$currentver is less than supported version $requiredver for upgrade to CDP-DC\n"
-        echo -e "Databse for $component: $db_type-$currentver is less than supported version $requiredver for upgrade to CDP-DC\n" >> $out
+        echo -e "Database for $component: $db_type-$currentver is less than supported version $requiredver for upgrade to CDP-DC\n"
+        echo -e "Database for $component: $db_type-$currentver is less than supported version $requiredver for upgrade to CDP-DC\n" >> $out
  fi
 
 done < "$input"

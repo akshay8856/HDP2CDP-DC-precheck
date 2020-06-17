@@ -14,8 +14,8 @@ LOGIN=$3
 PASSWORD=$4
 protocol=$5
 cluster_name=$6
-iskerberos=$7
-now=$8
+iskerberos=$8
+now=$7
 backdir=atlasbackup$now
 
 

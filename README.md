@@ -57,7 +57,7 @@ To ease the launch of this script :
 ```
 - Create home directory for root user in hdfs ;
  $ su - hdfs 
- $ mkdir /user/root 
+ $  hdfs dfs -mkdir /user/root 
  $ hdfs dfs -chown root:root /user/root
  
 - Enable acls for hdfs by configuring dfs.namenode.acls.enabled=true in custom hdfs-site.xml. Restart required services
