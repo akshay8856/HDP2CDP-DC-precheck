@@ -81,6 +81,16 @@ if ! [ -x "$(command -v ssh-keyscan)" ]; then
   exit 1
 fi
 
+if ! [ -x "$(command -v hdfs)" ]; then
+  echo -e "\e[31mError: hdfs client is not installed.\e[0m"
+  exit 1
+fi
+
+if ! [ -x "$(command -v hadoop)" ]; then
+  echo -e "\e[31mError: hadoop client is not installed.\e[0m"
+  exit 1
+fi
+
 ############################################################################################################
 #
 #				*******	COLLECTING AMBARI DETAILS *******
@@ -179,7 +189,27 @@ israngerkms=`grep -w "RANGER_KMS" $INTR/files/services.txt`
 ishive=`grep -w "HIVE" $INTR/files/services.txt`
 iskerberos=`grep -w "KERBEROS" $INTR/files/services.txt`
 isoozie=`grep -w "OOZIE" $INTR/files/services.txt`
-#isatlas
+isatlas=`grep -w "ATLAS" $INTR/files/services.txt`
+
+if [ -z "$isatlas" ]
+then
+   :
+else
+if ! [ -x "$(command -v hbase)" ]; then
+  echo -e "\e[31mError: hbase client is not installed.\e[0m"
+  exit 1
+fi
+fi
+
+if [ -z "$iskerberos" ]
+then
+   :
+else
+   if ! [ -x "$(command -v kinit)" ]; then
+   echo -e "\e[31mError: Kerberos client is not installed.\e[0m"
+   exit 1
+  fi
+fi
 
 if [ -z "$isranger" ]
 then
@@ -563,13 +593,37 @@ fi
 
 echo -e "\e[35m########################################################\e[0m\n"
 
+
+############################################################################################################
+#
+#                    Atlas Backup
+# 
+#
+############################################################################################################
+if [ -z "$isatlas" ]
+then
+echo -e "\e[31m Will Skip\e[0m \e[96mPREREQ - 9. ATLAS BACKUP\e[0m \e[31m as atlas is not Installed\e[0m"
+else
+echo -e "\e[96mPREREQ - 9. ATLAS BACKUP\e[0m \e[1mRunning Atlas Backup:\e[21m  \n 1. Hbase table backup \n 2. Shard backup \n"
+
+sh $SCRIPTDIR/atlasbkp.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $PROTOCOL $cluster_name $iskerberos $today &> $LOGDIR/atlasbkp-$today.log &
+echo -e "Please check the logs in file:\e[1m $LOGDIR/atlasbkp-$today.log   \e[21m\n"
+echo -e "Check the status of the applicationsID in file:\e[1m $LOGDIR/atlasbkp-$today.log \e[21m\n"
+echo -e "Backup of hbase tables in stored in HDFS directory /atlasbackup$today   \e[21m\n"
+
+
+sleep 5
+fi
+echo -e "\e[35m########################################################\e[0m\n"
+
+
 ############################################################################################################
 #
 # 					CHECKING FOR AUTO RESTART FOR ALL COMPONENTS
 #
 ############################################################################################################
 
-echo -e "\e[96mPREREQ - 9. AUTO RESTART \e[0m \e[1mCheck If Auto Restart Is enabled ?\e[21m "
+echo -e "\e[96mPREREQ - 10. AUTO RESTART \e[0m \e[1mCheck If Auto Restart Is enabled ?\e[21m "
 autorestart=$(curl -s -u $LOGIN:$PASSWORD --insecure $PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/components?fields=ServiceComponentInfo/service_name,ServiceComponentInfo/recovery_enabled | grep -w '"recovery_enabled" : "true"' -B1  -A1 | grep -w '"component_name"' | awk -F ':' '{print $2}' | awk -F '"' '{print $2}' | tr -s '\n ' ',') 
 autorestart=${autorestart%,}
 
@@ -589,7 +643,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 #
 ############################################################################################################
 
-echo -e "\e[96mPREREQ - 10. DATABASE COMPATIBLITY CHECK \e[0m \e[1mChecking if database versions are supported ?\e[21m "
+echo -e "\e[96mPREREQ - 11. DATABASE COMPATIBLITY CHECK \e[0m \e[1mChecking if database versions are supported ?\e[21m "
 echo -e "\e[1m Initiating Database Version Checks for required components\e[21m "
 
 if [ -f $INTR/files/DB-versioncheck-$today.out ]; then
@@ -608,7 +662,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 #
 ############################################################################################################
 
-echo -e "\e[96mPREREQ - 11. AMBARI VIEW \e[0m \e[1mChecking for Instances of Ambari Views which are removed as part of upgrade ?\e[21m "
+echo -e "\e[96mPREREQ - 12. AMBARI VIEW \e[0m \e[1mChecking for Instances of Ambari Views which are removed as part of upgrade ?\e[21m "
 echo -e "\e[1m Initiating Ambari View Checks for required components\e[21m "
 
 sh $SCRIPTDIR/ambariview.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $PROTOCOL $INTR $today $REVIEW  &> $LOGDIR/AmbariView-$today.log &
@@ -624,9 +678,9 @@ echo -e "\e[35m########################################################\e[0m\n"
 #
 ############################################################################################################
 if [ -z "$iskerberos" ];then
-echo -e "\e[1mKerberos is not enabled on $cluster_name. Skipping \e[21m \e[96mPREREQ - 12. KERBEROS CHECK \e[0m"
+echo -e "\e[1mKerberos is not enabled on $cluster_name. Skipping \e[21m \e[96mPREREQ - 13. KERBEROS CHECK \e[0m"
 else
-	echo -e "\e[96mPREREQ - 12. KERBEROS CHECK \e[0m \e[1mChecking If Keytab & Krb5.conf is managed by Ambari? \e[21m "
+	echo -e "\e[96mPREREQ - 13. KERBEROS CHECK \e[0m \e[1mChecking If Keytab & Krb5.conf is managed by Ambari? \e[21m "
 	echo -e "\e[1m Initiating Kerberos check for managed keytabs and krb5.conf \e[21m "
 
 
@@ -694,7 +748,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 ############################################################################################################
 
 
-echo -e "\n\e[96mPREREQ - 13. OS & Service Check \e[0m  \e[1mChecking OS compatibility and running service check\e[21m"
+echo -e "\n\e[96mPREREQ - 14. OS & Service Check \e[0m  \e[1mChecking OS compatibility and running service check\e[21m"
 
 sh $SCRIPTDIR/run_all_service_check.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $REVIEW/os $REVIEW/servicecheck $today $INTR/files/ $PROTOCOL &> $LOGDIR/os-servicecheck-$today.log  &
 
