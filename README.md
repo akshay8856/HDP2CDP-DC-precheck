@@ -1,4 +1,3 @@
-
 ## HDP2.6 To CDP-DC Preupgrade Checks
 
 This tool is to help customers to prepare and plan for upgrade from HDP to CDP-DC. Helps to get details on what actions are required before upgrading the HDP 2.x clusters.
