@@ -627,7 +627,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 ############################################################################################################
 echo -e "\e[96mPREREQ - 7. Third Party \e[0m \e[1mThird Party Services to be deleted before upgrade\e[21m"
 
-thirdparty=`egrep -vi "AMBARI_INFRA|OOZIE|LOGSEARCH|AMBARI_METRICS|ATLAS|FLUME|HBASE|HDFS|HIVE|KAFKA|MAPREDUCE2|PIG|RANGER|RANGER_KMS|SLIDER|SMARTSENSE|SPARK|SPARK2|SQOOP|TEZ|YARN|ZOOKEEPER|NIFI|NIFI_REGISTRY|REGISTRY|STREAMLINE|KERBEROS|KNOX|ACCUMULO|DRUID|MAHOUT|STORM|LOGSEARCH|SUPERSET" $INTR/files/services.txt | grep -v -i spark2 | tr -s '\n ' ','`
+thirdparty=`egrep -vi "AMBARI_INFRA|FALCON|ZEPPELIN|OOZIE|LOGSEARCH|AMBARI_METRICS|ATLAS|FLUME|HBASE|HDFS|HIVE|KAFKA|MAPREDUCE2|PIG|RANGER|RANGER_KMS|SLIDER|SMARTSENSE|SPARK|SPARK2|SQOOP|TEZ|YARN|ZOOKEEPER|NIFI|NIFI_REGISTRY|REGISTRY|STREAMLINE|KERBEROS|KNOX|ACCUMULO|DRUID|MAHOUT|STORM|LOGSEARCH|SUPERSET" $INTR/files/services.txt | grep -v -i spark2 | tr -s '\n ' ','`
 thirdparty=${thirdparty%,}
 
 if [ -z "$thirdparty" ];then
