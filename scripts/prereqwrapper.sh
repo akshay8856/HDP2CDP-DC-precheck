@@ -97,30 +97,85 @@ fi
 #  Do not change the order of the section marked with *******
 ############################################################################################################
 
-echo -en "\e[96mEnter Ambari server host name : \e[0m"
-read "ambarihost"
-AMBARI_HOST=$ambarihost
-echo -en "\e[96mEnter Ambari server port : \e[0m"
-read "ambariport"
-PORT=$ambariport
+for i in "$@"
+do
+case $i in
+    -A=*|--ambari=*)
+    AMBARI_HOST="${i#*=}"
+    shift # past argument=value
+    ;;
+    -P=*|--port=*)
+    PORT="${i#*=}"
+    shift # past argument=value
+    ;;
+    -U=*|--user=*)
+    LOGIN="${i#*=}"
+    shift # past argument=value
+    ;;
+    -PWD=*|--password=*)
+    PASSWORD="${i#*=}"
+    shift # past argument=value
+    ;;
+    -S=*|--ssl=*)
+    SSL="${i#*=}"
+    shift # past argument=value
+    ;;
+    -HMS=*|--hms=*)
+    hms_dbpwd="${i#*=}"
+    shift # past argument=value
+    ;;
+    -HS2URI=*|--hs2jdbcuri=*)
+    hs2jdbcuri="${i#*=}"
+    shift # past argument=value
+    ;;
+    -RP=*|--ranger_pwd=*)
+    RANGERPASSWORD="${i#*=}"
+    shift # past argument=value
+    ;;
+    -RKP=*|--ranger_kms_pwd=*)
+    RANGER_KMS_PASSWORD="${i#*=}"
+    shift # past argument=value
+    ;;
+    -OP=*|--oozie_pwd=*)
+    OOZIE_PASSWORD="${i#*=}"
+    shift # past argument=value
+    ;;
+    --default)
+    DEFAULT=YES
+    shift # past argument with no value
+    ;;
+    *)
+          # unknown option
+    ;;
+esac
+done
+
+############################################################################
+
+#echo -en "\e[96mEnter Ambari server host name : \e[0m"
+#read "ambarihost"
+#AMBARI_HOST=$ambarihost
+#echo -en "\e[96mEnter Ambari server port : \e[0m"
+#read "ambariport"
+#PORT=$ambariport
 #echo -en "\e[96mIs SSL enabled for $AMBARI_HOST (yes/no) : \e[0m"
 #read  "ssl"
 #SSL=$ssl
-echo -en "\e[96mEnter Ambari admin's User Name: \e[0m"
-read "username"
-echo -en "\e[96mEnter Password for $username : \e[0m"
-read -s "pwd"
-LOGIN=$username
-PASSWORD=$pwd
+#echo -en "\e[96mEnter Ambari admin's User Name: \e[0m"
+#read "username"
+#echo -en "\e[96mEnter Password for $username : \e[0m"
+#read -s "pwd"
+#LOGIN=$username
+#PASSWORD=$pwd
 
-while true; do
-    read -p $'\n\e[96mPlease confirm if you have enabled SSL for Ambari (y/n) ? :\e[0m' yn
-    case $yn in
-        [Yy]* )  SSL=yes ; break;;
-        [Nn]* )  SSL=no ; break;;
-        * ) echo "Please answer yes or no.";;
-    esac
-done
+#while true; do
+#    read -p $'\n\e[96mPlease confirm if you have enabled SSL for Ambari (y/n) ? :\e[0m' yn
+#    case $yn in
+#        [Yy]* )  SSL=yes ; break;;
+#        [Nn]* )  SSL=no ; break;;
+#        * ) echo "Please answer yes or no.";;
+#    esac
+#done
 ############################################################################################################
 #
 #				******* SETTING PROTOCOL FOR CURL  *******
@@ -151,7 +206,7 @@ fi
 # Do not change the order of the section marked with *******
 ############################################################################################################
 
-INTR=/HDP2CDP-DC-precheck
+INTR=/upgrade
 HIVECFG=$INTR/hivechecks
 SCRIPTDIR=$INTR/scripts
 REVIEW=$INTR/review
@@ -211,13 +266,25 @@ else
   fi
 fi
 
+
 if [ -z "$isranger" ]
 then
    :
 else
-echo -en "\e[96mEnter Password for Ranger Database : \e[0m"
-read -s "rpwd"
-RANGERPASSWORD=$rpwd
+echo -en "\e[96mChecking if Password for Ranger Database is available:\e[0m\n"
+
+  if [ -z "$RANGERPASSWORD" ]
+  then
+   echo -e "\e[31mRanger Database password is not provided but Ranger_KMS is installed \nWill skip Ranger Database backup and Database Compatibility check\e[0m"
+   while true; do
+    read -p $'\e[96mPlease confirm if you still want to continue (y/n) ? :\e[0m' yn
+    case $yn in
+        [Yy]* ) echo -e "" ; break;;
+        [Nn]* ) exit;;
+        * ) echo "Please answer yes or no.";;
+    esac
+   done
+   fi
 fi
 
 
@@ -225,10 +292,20 @@ if [ -z "$israngerkms" ]
 then
    :
 else
-echo -e "\n"
-echo -en "\e[96mEnter Password for Ranger_KMS Database : \e[0m"
-read -s "rkmspwd"
-RANGER_KMS_PASSWORD=$rkmspwd
+echo -en "\e[96mChecking if Password for Ranger_KMS Database is available:\e[0m\n"
+
+  if [ -z "$RANGER_KMS_PASSWORD" ]
+  then
+   echo -e "\e[31mRanger_KMS Database password is not provided but Ranger_KMS is installed \nWill skip Ranger_KMS Database backup and Database Compatibility check\e[0m"
+   while true; do
+    read -p $'\e[96mPlease confirm if you still want to continue (y/n) ? :\e[0m' yn
+    case $yn in
+        [Yy]* ) echo -e "" ; break;;
+        [Nn]* ) exit;;
+        * ) echo "Please answer yes or no.";;
+    esac
+   done
+   fi
 fi
 
 
@@ -236,28 +313,49 @@ if [ -z "$isoozie" ]
 then
    :
 else
-echo -e "\n"
-echo -en "\e[96mEnter Password for Oozie Database : \e[0m"
-read -s "rpwd"
-OOZIE_PASSWORD=$rpwd
+echo -en "\e[96mChecking if Password for OOZIE Database is available:\e[0m\n"
+
+  if [ -z "$OOZIE_PASSWORD" ]
+  then
+   echo -e "\e[31mOozie Database password is not provided but Oozie is installed\nWill Skip Oozie Database backup and Database Compatibility Check\e[0m"
+   while true; do
+    read -p $'\e[96mPlease confirm if you still want to continue (y/n) ? :\e[0m' yn
+    case $yn in
+        [Yy]* ) echo -e "" ; break;;
+        [Nn]* ) exit;;
+        * ) echo "Please answer yes or no.";;
+    esac
+   done
+   fi
 fi
 
 
 ###  Entering Hive check Loop
-
 if [ -z "$ishive" ]
 then
    :
 else
- echo -en "\n\n\e[96mPlease enter the password of Hive Metasore Database: \e[0m"
- read -s "hmspwd"
- hms_dbpwd=$hmspwd
 
- echo -e "\n\e[1mHiveServer2 JDBC URI should be the exact string used to connect using beeline \nFor example: jdbc:hive2://c1110-node4.coelab.cloudera.com:10000/ \e[21m\n "
- echo -en "\e[96mPlease enter the JBDC URI for HiveServer2: \e[0m"
- read "hs2jdbc"
- hs2jdbcuri=$hs2jdbc
+ echo -en "\e[96mChecking if Password for Hive Metastore Database is available:\e[0m\n"
+ if [ -z "$hms_dbpwd" ]
+  then
+   echo -e "\e[31mHive Metastore Database is not passed \nHive has major changes, please configure password by passing -HMS or --hms parameter \e[0m"
+   while true; do
+    read -p $'\e[96mPlease confirm if you still want to continue (y/n) ? :\e[0m' yn
+    case $yn in
+        [Yy]* ) echo -e "" ; break;;
+        [Nn]* ) exit;;
+        * ) echo "Please answer yes or no.";;
+    esac
+   done
+   fi
 
+# echo -e "\n\e[1mHiveServer2 JDBC URI should be the exact string used to connect using beeline \nFor example: jdbc:hive2://c1110-node4.coelab.cloudera.com:10000/ \e[21m\n "
+# echo -en "\e[96mPlease enter the JBDC URI for HiveServer2: \e[0m"
+# read "hs2jdbc"
+# hs2jdbcuri=$hs2jdbc
+ 
+ 
    if ! [ -x "$(command -v hive)" ]; then
    echo -e "\e[31mError: hiveclient is not installed.\e[0m"
    echo -e "\e[96mPREREQ - 8. HIVE CHECK\e[0m Will not give expected results.\n \e[1mPlease Install Hive Client on this node\e[21m\n"
@@ -537,7 +635,7 @@ if [ -z "$thirdparty" ];then
 echo -e "\e[1mThere are no Third Party Services installed on this cluster $cluster_name\e[21m\n"
 else
 echo -e "\e[31mBelow Third Party services are installed in cluster $cluster_name \nPlease remove this before upgrade:\e[0m \n\e[1m $thirdparty\e[21m"
-echo -e "Below Third Party services are installed in cluster $cluster_name \nPlease remove this before  upgrade: \n$thirdparty"  >> $REVIEW/servicecheck/third-party-$today.out
+echo -e "Below Third Party services are installed in cluster $cluster_name \nPlease remove below services before upgrade: \n$thirdparty"  >> $REVIEW/servicecheck/third-party-$today.out
 echo -e "\e[1mOutput is available in the file: $REVIEW/servicecheck/third-party-$today.out \e[21m"
 fi
 echo -e "\e[35m########################################################\e[0m\n"

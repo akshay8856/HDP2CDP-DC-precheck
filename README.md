@@ -65,7 +65,21 @@ To ease the launch of this script :
 - Set acl for root :
 $ hdfs dfs -setfacl -R -m user:root:rwx /
 
-- Execute the script prereqwrapper.sh
+- Execute the script prereqwrapper.sh with required parameters:
+$ sh /HDP2CDP-DC-precheck/scripts/prereqwrapper.sh --ambari=<ambari-hostname> --port=<port> --user=<ambari-admin> --password=<ambari-admin-pwd> --ssl=<yes/no> --hms=<HMS_DB_PWD>  --ranger_pwd=<RANGER_DB_PWD> --ranger_kms_pwd=<RANGERKMS_DB_PWD> --oozie_pwd=<OOZIE_DB_PWD>
+
+-A 	| --ambari   		: Ambari Hostname
+-P  | --port			: Ambari Port
+-U  | --user			: Ambari Admin User
+-PWD| --passwod			: Ambari Admin Password
+-S  | --ssl				: SSL enabled (yes/no)
+-HMS| --hms				: Hive Metasore Database Password
+-RP | --ranger_pwd  	: Ranger Database Password
+-RKP| --ranger_kms_pwd	: Ranger KMS Database Password
+-OP | --oozie_pwd		: Ooize Database Password
+
+For example :
+# sh /HDP2CDP-DC-precheck/scripts/prereqwrapper.sh  --ambari=c3110-node1 --port=8080 --user=admin --password=amankumbare --ssl=no --hms=hadoop --hs2jdbcuri=test --ranger_pwd=rangerdba --ranger_kms_pwd=rangerkms --oozie_pwd=akshayooze
 
 ```
 
@@ -83,9 +97,23 @@ $ hdfs dfs -setfacl -R -m user:root:rwx /
 
 1. Clone this repository on the edge node
 
-2. Run the prereqwrapper.sh script 
+2. Run the prereqwrapper.sh script with required  parameters:
 ```
-$ sh /HDP2CDP-DC-precheck/scripts/prereqwrapper.sh
+$ sh /HDP2CDP-DC-precheck/scripts/prereqwrapper.sh --ambari=<ambari-hostname> --port=<port> --user=<ambari-admin> --password=<ambari-admin-pwd> --ssl=<yes/no> --hms=<HMS_DB_PWD>  --ranger_pwd=<RANGER_DB_PWD> --ranger_kms_pwd=<RANGERKMS_DB_PWD> --oozie_pwd=<OOZIE_DB_PWD>
+
+-A 	| --ambari   		: Ambari Hostname
+-P  | --port			: Ambari Port
+-U  | --user			: Ambari Admin User
+-PWD| --passwod			: Ambari Admin Password
+-S  | --ssl				: SSL enabled (yes/no)
+-HMS| --hms				: Hive Metasore Database Password
+-RP | --ranger_pwd  	: Ranger Database Password
+-RKP| --ranger_kms_pwd	: Ranger KMS Database Password
+-OP | --oozie_pwd		: Ooize Database Password
+
+For example :
+# sh /HDP2CDP-DC-precheck/scripts/prereqwrapper.sh  --ambari=c3110-node1 --port=8080 --user=admin --password=amankumbare --ssl=no --hms=hadoop --hs2jdbcuri=test --ranger_pwd=rangerdba --ranger_kms_pwd=rangerkms --oozie_pwd=akshayooze
+
 ```
 
 ### Results 
