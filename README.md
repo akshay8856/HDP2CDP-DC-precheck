@@ -79,7 +79,7 @@ $ sh /HDP2CDP-DC-precheck/scripts/prereqwrapper.sh --ambari=<ambari-hostname> --
 -OP | --oozie_pwd		: Ooize Database Password
 
 For example :
-# sh /HDP2CDP-DC-precheck/scripts/prereqwrapper.sh  --ambari=c3110-node1 --port=8080 --user=admin --password=amankumbare --ssl=no --hms=hadoop --hs2jdbcuri=test --ranger_pwd=rangerdba --ranger_kms_pwd=rangerkms --oozie_pwd=akshayooze
+# sh /HDP2CDP-DC-precheck/scripts/prereqwrapper.sh  --ambari=c3110-node1 --port=8080 --user=admin --password=amankumbare --ssl=no --hms=hadoop --ranger_pwd=rangerdba --ranger_kms_pwd=rangerkms --oozie_pwd=akshayooze
 
 ```
 
@@ -112,7 +112,7 @@ $ sh /HDP2CDP-DC-precheck/scripts/prereqwrapper.sh --ambari=<ambari-hostname> --
 -OP | --oozie_pwd		: Ooize Database Password
 
 For example :
-# sh /HDP2CDP-DC-precheck/scripts/prereqwrapper.sh  --ambari=c3110-node1 --port=8080 --user=admin --password=amankumbare --ssl=no --hms=hadoop --hs2jdbcuri=test --ranger_pwd=rangerdba --ranger_kms_pwd=rangerkms --oozie_pwd=akshayooze
+# sh /HDP2CDP-DC-precheck/scripts/prereqwrapper.sh  --ambari=c3110-node1 --port=8080 --user=admin --password=amankumbare --ssl=no --hms=hadoop  --ranger_pwd=rangerdba --ranger_kms_pwd=rangerkms --oozie_pwd=akshayooze
 
 ```
 
