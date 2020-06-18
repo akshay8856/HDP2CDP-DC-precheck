@@ -271,7 +271,7 @@ if [ -z "$isranger" ]
 then
    :
 else
-echo -en "\e[96mChecking if Password for Ranger Database is available:\e[0m\n"
+#echo -en "\e[96mChecking if Password for Ranger Database is available:\e[0m\n"
 
   if [ -z "$RANGERPASSWORD" ]
   then
@@ -292,7 +292,7 @@ if [ -z "$israngerkms" ]
 then
    :
 else
-echo -en "\e[96mChecking if Password for Ranger_KMS Database is available:\e[0m\n"
+#echo -en "\e[96mChecking if Password for Ranger_KMS Database is available:\e[0m\n"
 
   if [ -z "$RANGER_KMS_PASSWORD" ]
   then
@@ -313,7 +313,7 @@ if [ -z "$isoozie" ]
 then
    :
 else
-echo -en "\e[96mChecking if Password for OOZIE Database is available:\e[0m\n"
+#echo -en "\e[96mChecking if Password for OOZIE Database is available:\e[0m\n"
 
   if [ -z "$OOZIE_PASSWORD" ]
   then
@@ -335,8 +335,7 @@ if [ -z "$ishive" ]
 then
    :
 else
-
- echo -en "\e[96mChecking if Password for Hive Metastore Database is available:\e[0m\n"
+# echo -en "\e[96mChecking if Password for Hive Metastore Database is available:\e[0m\n"
  if [ -z "$hms_dbpwd" ]
   then
    echo -e "\e[31mHive Metastore Database is not passed \nHive has major changes, please configure password by passing -HMS or --hms parameter \e[0m"
