@@ -53,7 +53,7 @@ To ease the launch of this script :
 
 3. Hive Client Must be Installed on the node where this script is executed
 
-4. For unsecured cluster : (This is required for Hive Pre Upgrade check)
+4. For unsecured cluster : (This is required for Hive Pre Upgrade check & Atlas hbase table backup)
 ```
 - Create home directory for root user in hdfs ;
  $ su - hdfs 
@@ -63,7 +63,7 @@ To ease the launch of this script :
 - Enable acls for hdfs by configuring dfs.namenode.acls.enabled=true in custom hdfs-site.xml. Restart required services
 
 - Set acl for root :
-$ hdfs dfs -setfacl -R -m user:root:r-x /
+$ hdfs dfs -setfacl -R -m user:root:rwx /
 
 - Execute the script prereqwrapper.sh
 

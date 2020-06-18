@@ -46,13 +46,13 @@ echo -e "\e[35m########################################################\e[0m\n"
 ############################################################################################################
 if ! [ -x "$(command -v mysqldump)" ]; then
   echo -e "\e[31mError: mysqldump is not installed.\e[0m"
-  echo -e "\e[31mPlease install mysql package\e[0m"
+  echo -e "\e[31mPlease install mysql client\e[0m"
   exit 1
 fi
 
 if ! [ -x "$(command -v pg_dump)" ]; then
   echo -e "\e[31mError: pg_dump is not installed.\e[0m"
-  echo -e "\e[31mPlease install postgresql package\e[0m"
+  echo -e "\e[31mPlease install postgresql client\e[0m"
   exit 1
 fi
 
@@ -151,7 +151,7 @@ fi
 # Do not change the order of the section marked with *******
 ############################################################################################################
 
-INTR=/HDP2CDP-DC-precheck
+INTR=/upgrade
 HIVECFG=$INTR/hivechecks
 SCRIPTDIR=$INTR/scripts
 REVIEW=$INTR/review
@@ -608,10 +608,10 @@ echo -e "\n\e[32mAtlas Is Not Installed, Skipping Skipping\e[0m \e[96mPREREQ - 9
 else
 echo -e "\e[96mPREREQ - 9. ATLAS BACKUP\e[0m \e[1mRunning Atlas Backup:\e[21m  \n 1. Hbase table backup \n 2. Shard backup \n"
 
-sh $SCRIPTDIR/atlasbkp.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $PROTOCOL $cluster_name $iskerberos $today &> $LOGDIR/atlasbkp-$today.log &
+sh $SCRIPTDIR/atlasbkp.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $PROTOCOL $cluster_name $today $iskerberos &> $LOGDIR/atlasbkp-$today.log &
 echo -e "Please check the logs in file:\e[1m $LOGDIR/atlasbkp-$today.log   \e[21m\n"
 echo -e "Check the status of the applicationsID in file:\e[1m $LOGDIR/atlasbkp-$today.log \e[21m\n"
-echo -e "Backup of hbase tables in stored in HDFS directory /atlasbackup$today   \e[21m\n"
+echo -e "Backup of hbase tables is stored in HDFS directory /atlasbackup$today   \e[21m\n"
 
 
 sleep 5
@@ -670,7 +670,6 @@ echo -e "\e[1m Initiating Ambari View Checks for required components\e[21m "
 sh $SCRIPTDIR/ambariview.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $PROTOCOL $INTR $today $REVIEW  &> $LOGDIR/AmbariView-$today.log &
 echo -e "\e[1mOutput is available in the file: $REVIEW/servicecheck/ambariview-$today.out \e[21m"
 echo -e "\e[1mPlease check the logs in the file : $LOGDIR/AmbariView-$today.log  \e[21m"
-
 echo -e "\e[35m########################################################\e[0m\n"
 
 
