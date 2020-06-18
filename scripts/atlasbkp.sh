@@ -69,8 +69,8 @@ echo -e "######################################################## \n"e
 
 else
 
-hdfs_user=$(curl -s -u $LOGIN:$PASSWORD --insecure "$hdfsconfig" | grep -w '"hdfs_user"'| awk -F ':' '{print $2}' | awk -F '"' '{print $2}') 
-hbase_user=$(curl -s -u $LOGIN:$PASSWORD --insecure "$hbaseconfig" | grep -w '"hbase_user"' | awk -F ':' '{print $2}' | awk -F '"' '{print $2}')
+#hdfs_user=$(curl -s -u $LOGIN:$PASSWORD --insecure "$hdfsconfig" | grep -w '"hdfs_user"'| awk -F ':' '{print $2}' | awk -F '"' '{print $2}') 
+#hbase_user=$(curl -s -u $LOGIN:$PASSWORD --insecure "$hbaseconfig" | grep -w '"hbase_user"' | awk -F ':' '{print $2}' | awk -F '"' '{print $2}')
 
 #sh -x $scriptdir/createhdfs.sh  $hdfs_user $hbase_user $backdir && sleep 5
 #su - $hdfsuser
@@ -81,7 +81,9 @@ hbase_user=$(curl -s -u $LOGIN:$PASSWORD --insecure "$hbaseconfig" | grep -w '"h
 #hdfs dfs -chown $hbaseuser:$hdfsuser /$backdir
 
 
-sudo -u $hdfs_user hadoop fs -mkdir /$backdir && sudo -u $hdfs_user hadoop fs -chown $hbase_user:$hdfs_user /$backdir && sleep 2
+#sudo -u $hdfs_user hadoop fs -mkdir /$backdir && sudo -u $hdfs_user hadoop fs -chown $hbase_user:$hdfs_user /$backdir && sleep 2
+
+hdfs dfs -mkdir /$backdir
 
 if [ $? -eq 0 ]; then
 

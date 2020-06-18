@@ -36,6 +36,6 @@ curl -s -u $LOGIN:$PASSWORD --insecure $line/instances | grep href | awk -F '"' 
 
 done < "$intr/files/viewversion-$now.txt"
 
-echo -e "\nPlease refer https://docs.cloudera.com/cdp/latest/upgrade-hdp/topics/amb-changes-services-views.html for more information""
+echo -e "\nPlease refer https://docs.cloudera.com/cdp/latest/upgrade-hdp/topics/amb-changes-services-views.html for more information"
 
 
