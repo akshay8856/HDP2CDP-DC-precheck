@@ -469,8 +469,8 @@ echo -e "\e[96mPREREQ - 1. Ambari Backup :\e[0m  \e[1m Ambari Backup and Config\
 while true; do
     read -p $'\e[96mWe will need to start and stop Ambari. Please confirm if we should proceed (y/n) ? :\e[0m' yn
     case $yn in
-        [Yy]* ) sh $SCRIPTDIR/ambaribkp.sh $AMBARI_HOST $BKP $today $INTR $REVIEW &> $LOGDIR/ambaribkp-$today.log & 
-				#sh $SCRIPTDIR/ambaribkp.sh $AMBARI_HOST $BKP $today $REVIEW &> $LOGDIR/ambaribkp-$today.log &
+        [Yy]* ) sh -x  $SCRIPTDIR/ambaribkp.sh $AMBARI_HOST $BKP $today $INTR $REVIEW &> $LOGDIR/ambaribkp-$today.log & 
+				#sh -x  $SCRIPTDIR/ambaribkp.sh $AMBARI_HOST $BKP $today $REVIEW &> $LOGDIR/ambaribkp-$today.log &
 				echo -e "Please check the logs in the file: \e[1m $LOGDIR/ambaribkp-$today.log \e[21m \n"
 				echo -e "Backup of Ambari Database, ambari.properties, and ambari-env.sh is available in:\e[1m $BKP \e[21m Directory\n"
 
@@ -682,7 +682,7 @@ else
     echo -e "Add command for checking database version of $hms_dtype"
 fi
 
-sh $SCRIPTDIR/hiveprereq.sh $INTR/files/hive_databases.txt $HIVECFG  $REVIEW/hive  &> $LOGDIR/hivetablescan-$today.log &
+sh -x  $SCRIPTDIR/hiveprereq.sh $INTR/files/hive_databases.txt $HIVECFG  $REVIEW/hive  &> $LOGDIR/hivetablescan-$today.log &
 echo -e "Output is available in \e[1m $REVIEW/hive directory \e[21m"
 echo -e "Please check the logs in the file:\e[1m $LOGDIR/hivetablescan-$today.log   \e[21m\n"
 
@@ -705,7 +705,7 @@ echo -e "\n\e[32mAtlas Is Not Installed, Skipping Skipping\e[0m \e[96mPREREQ - 9
 else
 echo -e "\e[96mPREREQ - 9. ATLAS BACKUP\e[0m \e[1mRunning Atlas Backup:\e[21m  \n 1. Hbase table backup \n 2. Shard backup \n"
 
-sh $SCRIPTDIR/atlasbkp.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $PROTOCOL $cluster_name $today $iskerberos &> $LOGDIR/atlasbkp-$today.log &
+sh -x  $SCRIPTDIR/atlasbkp.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $PROTOCOL $cluster_name $today $iskerberos &> $LOGDIR/atlasbkp-$today.log &
 echo -e "Please check the logs in file:\e[1m $LOGDIR/atlasbkp-$today.log   \e[21m\n"
 echo -e "Check the status of the applicationsID in file:\e[1m $LOGDIR/atlasbkp-$today.log \e[21m\n"
 echo -e "Backup of hbase tables is stored in HDFS directory /atlasbackup$today   \e[21m\n"
@@ -746,7 +746,7 @@ echo -e "\e[96mPREREQ - 11. DATABASE COMPATIBLITY CHECK \e[0m \e[1mChecking if d
 echo -e "\e[1m Initiating Database Version Checks for required components\e[21m "
 
 if [ -f $INTR/files/DB-versioncheck-$today.out ]; then
-sh $SCRIPTDIR/dbcompatible.sh $INTR/files/DB-versioncheck-$today.out $today $REVIEW/servicecheck &> $LOGDIR/DatabaseCompatibiltiyCheck-$today.log
+sh -x  $SCRIPTDIR/dbcompatible.sh $INTR/files/DB-versioncheck-$today.out $today $REVIEW/servicecheck &> $LOGDIR/DatabaseCompatibiltiyCheck-$today.log
 echo -e "\e[1mOutput is available in the file: $REVIEW/servicecheck/DatabaseCompatibiltiyCheck-$today.out \e[21m"
 echo -e "\e[1mPlease check the logs in the file : $LOGDIR/DatabaseCompatibiltiyCheck-$today.log  \e[21m"
 else 
@@ -764,7 +764,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 echo -e "\e[96mPREREQ - 12. AMBARI VIEW \e[0m \e[1mChecking for Instances of Ambari Views which are removed as part of upgrade ?\e[21m "
 echo -e "\e[1m Initiating Ambari View Checks for required components\e[21m "
 
-sh $SCRIPTDIR/ambariview.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $PROTOCOL $INTR $today $REVIEW  &> $LOGDIR/AmbariView-$today.log &
+sh -x  $SCRIPTDIR/ambariview.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $PROTOCOL $INTR $today $REVIEW  &> $LOGDIR/AmbariView-$today.log &
 echo -e "\e[1mOutput is available in the file: $REVIEW/servicecheck/ambariview-$today.out \e[21m"
 echo -e "\e[1mPlease check the logs in the file : $LOGDIR/AmbariView-$today.log  \e[21m"
 echo -e "\e[35m########################################################\e[0m\n"
@@ -848,7 +848,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 
 echo -e "\n\e[96mPREREQ - 14. OS & Service Check \e[0m  \e[1mChecking OS compatibility and running service check\e[21m"
 
-sh $SCRIPTDIR/run_all_service_check.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $REVIEW/os $REVIEW/servicecheck $today $INTR/files/ $PROTOCOL &> $LOGDIR/os-servicecheck-$today.log  &
+sh -x  $SCRIPTDIR/run_all_service_check.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $REVIEW/os $REVIEW/servicecheck $today $INTR/files/ $PROTOCOL &> $LOGDIR/os-servicecheck-$today.log  &
 
 echo -e "\e[1mOutput is available in the file: $REVIEW/os/oscheck-$today.out \e[21m"
 echo -e "Please check the logs in the file: \e[1m$LOGDIR/os-servicecheck-$today.log\e[21m\n"
