@@ -45,6 +45,8 @@ To ease the launch of this script :
 1. Configure access to Ambari, Ranger, RangerKMS, HiveMetastore and Oozie database from the node on which script is to be executed:
 
 ```
+To confirm access to database :
+
 For Mysql :
 mysql -h <database-host> -u <user> -p<password> <database-name>
 
