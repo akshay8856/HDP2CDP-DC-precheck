@@ -42,7 +42,23 @@ The intent is to save the time required to prepare and perform upgrade.
 
 To ease the launch of this script :
 
-1. Configure access to Ambari, Ranger, RangerKMS, HiveMetastore and Oozie database.
+1. Configure access to Ambari, Ranger, RangerKMS, HiveMetastore and Oozie database from the node on which script is to be executed:
+
+```
+For Mysql :
+mysql -h <database-host> -u <user> -p<password> <database-name>
+
+For example:
+mysql -h node3.example.com -u rangerdba -prangerdba ranger
+
+For Postgres:
+psql -h <database-host> -U <user> <databasename>
+Enter Password for user:
+
+For example:
+psql -h node3.example.com -u rangerdba ranger
+Enter Password for rangerdba: 
+```
 
 2. Configure passwordless SSH access :
    edge node and Ambari host to take backup of ambari.properties and ambari-env. 
