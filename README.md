@@ -37,7 +37,6 @@ The intent is to save the time required to prepare and perform upgrade.
 
 1. Atlas backup (solr collections)
 
-2. SSL (TBD)
 
 ### Environment Settings
 
@@ -49,9 +48,9 @@ To ease the launch of this script :
    edge node and Ambari host to take backup of ambari.properties and ambari-env. 
    egde node and Infra Solr Instances to take backup of shards 
 
-*Example Output:* If passwordless SSH cannot be configured you need to take backup of ambari.properties and ambari-env manually.
+*Note: If passwordless SSH cannot be configured you need to take backup of ambari.properties, ambari-env and Atlas related shards in Ambari infra manually*
 
-3. Hive Client Must be Installed on the node where this script is executed
+3. Hive Client Must be Installed on the node where this script is executed. Hbase client should be installed if Atlas is installed in the cluster.
 
 4. For unsecured cluster : (This is required for Hive Pre Upgrade check & Atlas hbase table backup)
 ```
@@ -67,16 +66,22 @@ $ hdfs dfs -setfacl -R -m user:root:rwx /
 
 - Execute the script prereqwrapper.sh with required parameters as described below.
 
+- Once script is completed remove the acl for the root user 
+$ hdfs dfs -setfacl -x user:root /
+
+
 ```
 
 5. For Secured Cluster : (This is required for Hive Pre Upgrade check)
 ```
  - Give ambari-qa user readonly permission to all paths in HDFS in Ranger
+ 
  - As root user get kerberos ticket for the ambari-qa user for which you created policy 
  $ kinit -kt /etc/security/keytabs/smokeuser.headless.keytab ambari-qa-c3110@REALMNAME
  $ klist 
 
 - Execute the script prereqwrapper.sh with required parameters as described below
+
 ```
 
 ### How to execute ?
@@ -98,7 +103,7 @@ $ sh /HDP2CDP-DC-precheck/scripts/prereqwrapper.sh --ambari=<ambari-hostname> --
 -OP | --oozie_pwd		: Ooize Database Password
 
 For example :
-# sh /HDP2CDP-DC-precheck/scripts/prereqwrapper.sh  --ambari=c3110-node1 --port=8080 --user=admin --password=amankumbare --ssl=no --hms=hadoop --hs2jdbcuri=test --ranger_pwd=rangerdba --ranger_kms_pwd=rangerkms --oozie_pwd=akshayooze
+# sh /HDP2CDP-DC-precheck/scripts/prereqwrapper.sh  --ambari=c3110-node1 --port=8080 --user=admin --password=amankumbare --ssl=no --hms=hadoop  --ranger_pwd=rangerdba --ranger_kms_pwd=rangerkms --oozie_pwd=akshayoozie
 
 ```
 
