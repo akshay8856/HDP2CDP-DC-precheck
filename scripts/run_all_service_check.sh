@@ -13,10 +13,10 @@ PORT=$2
 LOGIN=$3
 PASSWORD=$4 
 OSOUT=$5
-SERCHK=$6
-date=$7
-intr=$8
-protocol=$9
+#SERCHK=$6
+date=$6
+intr=$7
+protocol=$8
 
 # Configuring cluster name
 cluster_name=$(curl -s -u $LOGIN:$PASSWORD --insecure "$protocol://$AMBARI_HOST:$PORT/api/v1/clusters"  | python -mjson.tool | perl -ne '/"cluster_name":.*?"(.*?)"/ && print "$1\n"')
@@ -26,29 +26,6 @@ cluster_name=$(curl -s -u $LOGIN:$PASSWORD --insecure "$protocol://$AMBARI_HOST:
 if [ -z "$cluster_name" ]; then
     exit
 fi
-
-# OS version check 
-echo -e "\nChecking if OS version of the nodes in cluster $cluster_name is compatible for upgrade"
-curl -s -u $LOGIN:$PASSWORD --insecure "$protocol://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/hosts" | grep host_name | awk -F ':' '{print $2}' |  awk -F '"' '{print $2}' >  $intr/hosts.txt
-
-
-while IFS= read -r host
-do
-os=$(curl -s -u $LOGIN:$PASSWORD --insecure "$protocol://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/hosts/$host?fields=Hosts/os_type" | grep os_type | grep -v href | awk -F ':' '{print $2}' |  awk -F '"' '{print $2}')
-
-if [ "$os" != "centos7" ]; then
- echo -e "Operating system for $host is NOT compatible for upgrade" >> $OSOUT/oscheck-$date.out
-else
- echo -e "Operating system for $host is compatible for upgrade" >> $OSOUT/oscheck-$date.out
-fi
-
-done < $intr/hosts.txt
-
-echo -e "\nPlease refer "https://docs.cloudera.com/cloudera-manager/7.1.1/installation/topics/cdpdc-os-requirements.html" for further details" >> $OSOUT/oscheck-$date.out
-echo -e "\nOS compatibility check completed for$cluster_name. \n please check the output in $OSOUT/oscheck-$date.out"
-# OS version check COMPLETED !!!!!
-
-
 
 echo -e "\nCluster name to run service check on is: $cluster_name"
  

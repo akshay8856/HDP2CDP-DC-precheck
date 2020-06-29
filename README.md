@@ -42,7 +42,12 @@ The intent is to save the time required to prepare and perform upgrade.
 
 To ease the launch of this script :
 
-1. Configure access to Ambari, Ranger, RangerKMS, HiveMetastore and Oozie database from the node on which script is to be executed:
+1. Make sure below packages are installed :
+
+Packages: wget postgresql mysql/mariadb mysql-connector-java postgresql-jdbc perl python
+Clients : hdfs yarn mapreduce2 tez hbase hive
+
+2. Configure access to Ambari, Ranger, RangerKMS, HiveMetastore and Oozie database from the node on which script is to be executed:
 
 ```
 To confirm access to database :
@@ -62,15 +67,15 @@ psql -h node3.example.com -u rangerdba ranger
 Enter Password for rangerdba: 
 ```
 
-2. Configure passwordless SSH access :
+3. Configure passwordless SSH access :
    edge node and Ambari host to take backup of ambari.properties and ambari-env. 
    egde node and Infra Solr Instances to take backup of shards 
 
 *Note: If passwordless SSH cannot be configured you need to take backup of ambari.properties, ambari-env and Atlas related shards in Ambari infra manually*
 
-3. Hive Client Must be Installed on the node where this script is executed. Hbase client should be installed if Atlas is installed in the cluster.
+4. Hive Client Must be Installed on the node where this script is executed. Hbase client should be installed if Atlas is installed in the cluster.
 
-4. For unsecured cluster : (This is required for Hive Pre Upgrade check & Atlas hbase table backup)
+5. For unsecured cluster : (This is required for Hive Pre Upgrade check & Atlas hbase table backup)
 ```
 - Create home directory for root user in hdfs ;
  $ su - hdfs 
@@ -90,7 +95,7 @@ $ hdfs dfs -setfacl -x user:root /
 
 ```
 
-5. For Secured Cluster : (This is required for Hive Pre Upgrade check)
+6. For Secured Cluster : (This is required for Hive Pre Upgrade check)
 ```
  - Give ambari-qa user readonly permission to all paths in HDFS in Ranger
  
@@ -108,20 +113,24 @@ $ hdfs dfs -setfacl -x user:root /
 
 2. Run the prereqwrapper.sh script with required  parameters:
 ```
-$ sh /HDP2CDP-DC-precheck/scripts/prereqwrapper.sh --ambari=<ambari-hostname> --port=<port> --user=<ambari-admin> --password=<ambari-admin-pwd> --ssl=<yes/no> --hms=<HMS_DB_PWD>  --ranger_pwd=<RANGER_DB_PWD> --ranger_kms_pwd=<RANGERKMS_DB_PWD> --oozie_pwd=<OOZIE_DB_PWD>
+$ sh /HDP2CDP-DC-precheck/scripts/prereqwrapper.sh --cdpdc_version=X.X.X --ambari=<ambari-hostname> --port=<port> --user=<ambari-admin> --password=<ambari-admin-pwd> --ssl=<yes/no> --hms=<HMS_DB_PWD>  --ranger_pwd=<RANGER_DB_PWD> --ranger_kms_pwd=<RANGERKMS_DB_PWD> --oozie_pwd=<OOZIE_DB_PWD>
 
+REQUIRED:
 -A 	| --ambari   		: Ambari Hostname
 -P  | --port			: Ambari Port
 -U  | --user			: Ambari Admin User
 -PWD| --passwod			: Ambari Admin Password
 -S  | --ssl				: SSL enabled (yes/no)
+-CDPDC |--cdpdc_version : CDP-DC version to upgrade to
+
+OPTIONAL:
 -HMS| --hms				: Hive Metasore Database Password
 -RP | --ranger_pwd  	: Ranger Database Password
 -RKP| --ranger_kms_pwd	: Ranger KMS Database Password
 -OP | --oozie_pwd		: Ooize Database Password
 
 For example :
-# sh /HDP2CDP-DC-precheck/scripts/prereqwrapper.sh  --ambari=c3110-node1 --port=8080 --user=admin --password=amankumbare --ssl=no --hms=hadoop  --ranger_pwd=rangerdba --ranger_kms_pwd=rangerkms --oozie_pwd=akshayoozie
+# sh /HDP2CDP-DC-precheck/scripts/prereqwrapper.sh  --cdpdc_version=7.1.1 --ambari=c3110-node1 --port=8080 --user=admin --password=amankumbare --ssl=no --hms=hadoop  --ranger_pwd=rangerdba --ranger_kms_pwd=rangerkms --oozie_pwd=akshayoozie
 
 ```
 

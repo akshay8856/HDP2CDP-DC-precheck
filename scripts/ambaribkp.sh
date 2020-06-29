@@ -66,7 +66,7 @@ sleep 2
 if [ "$ambaridbtype" == "postgres" ]; then
 
    echo -e "!!!! Taking Ambari DB backup in $BKPDIR/ambaridbbkpi$now.sql!!!! \n"
-PGPASSWORD=$ambaridbpwd  pg_dump  -h $AMBARIHOST -p 5432 -U $ambariuser  $ambaridb > $BKPDIR/ambaridbbkpi$now.sql
+ssh $AMBARIHOST "PGPASSWORD=$ambaridbpwd  pg_dump  -h $AMBARIHOST -p 5432 -U $ambariuser  $ambaridb > ambaridbbkpi$now.sql"
 
   echo -e "!!!! Checking Ambari Database Version!!!"
   ambraw=`PGPASSWORD=$ambaridbpwd psql -h $AMBARIHOST -U $ambariuser -c 'SHOW server_version;'`
@@ -74,7 +74,7 @@ PGPASSWORD=$ambaridbpwd  pg_dump  -h $AMBARIHOST -p 5432 -U $ambariuser  $ambari
   echo -e "ambari:$ambaridbtype:$ambdbv" >> $out/files/DB-versioncheck-$now.out
 
 elif [ "$ambaridbtype" == "mysql" ]; then
-   mysqldump -h $AMBARIHOST -u $ambariuser -p$ambaripwd $ambaridb > $BKPDIR/ambaridbbkpi$now.sql
+ssh $AMBARIHOST   "mysqldump -h $AMBARIHOST -u $ambariuser -p$ambaripwd $ambaridb > ambaridbbkpi$now.sql"
    echo -e "!!!! Checking Ambari Database Version!!!"
    ambraw=`mysql -h $AMBARIHOST -u $ambariuser -p$ambaripwd -e "SELECT VERSION();" |grep "\|"`
    ambdbv=`echo $ambraw | awk -F ' ' '{print $2}'`

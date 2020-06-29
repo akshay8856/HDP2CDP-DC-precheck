@@ -19,7 +19,7 @@
 echo -e "\e[35m########################################################\e[0m\n"
 echo -e "\e[96mPlease confirm if you have met following prerequisites :\e[0m\n"
 echo -e "0. You should have root access on this node"
-echo -e "1. Hive Client Must be Installed on this node"
+echo -e "1. hdfs yarn mapreduce2 tez hbase hive clients is Installed on this node"
 echo -e "2. Configure passwordless SSH access between edge node and Ambari to take backup of ambari.properties and ambari-env.\nIf passwordless SSH cannot be configured you need to take backup of ambari.properties and ambari-env manually."
 echo -e "3. Need Ambari details : Username, Password, Host, Port"
 echo -e "4. Need Ranger, RangerKMS, HiveMetastore and Oozie database password"
@@ -93,7 +93,7 @@ fi
 
 ############################################################################################################
 #
-#				*******	COLLECTING AMBARI DETAILS *******
+#				*******	COLLECTING AMBARI DETAILS & DATABASE PWD *******
 #  Do not change the order of the section marked with *******
 ############################################################################################################
 
@@ -140,6 +140,14 @@ case $i in
     OOZIE_PASSWORD="${i#*=}"
     shift # past argument=value
     ;;
+    -CDPDC=*|--cdpdc_version=*)
+    CDPDC="${i#*=}"
+    shift # past argument=value
+    ;;
+    -PWDSSH=*|--passwordless_ssh=*)
+    PWDSSH="${i#*=}"
+    shift # past argument=value
+    ;;
     --default)
     DEFAULT=YES
     shift # past argument with no value
@@ -149,6 +157,18 @@ case $i in
     ;;
 esac
 done
+
+############################################################################
+#    CHECKING IF CDP DC VERSION IS PASSED
+############################################################################
+
+if [ -z "$CDPDC" ]
+then
+      echo -e "\e[31mError: Please mention the CDP-DC version by passing -CDPDC or --cdpdc_version\e[0m"
+       exit 1
+else
+  :
+fi
 
 ############################################################################
 
@@ -182,6 +202,20 @@ done
 # Do not change the order of the section marked with *******
 ############################################################################################################
 
+if [ -z "$SSL" ]
+then
+      while true; do
+      read -p $'\n\e[96mPlease confirm if you have enabled SSL for Ambari (y/n) ? :\e[0m' yn
+      case $yn in
+         [Yy]* )  SSL=yes ; break;;
+         [Nn]* )  SSL=no ; break;;
+         * ) echo "Please answer yes or no.";;
+      esac
+    done
+else
+  :
+fi
+
 if  [ "$SSL" == "no" ];then
  export PROTOCOL=http
 else
@@ -212,6 +246,8 @@ SCRIPTDIR=$INTR/scripts
 REVIEW=$INTR/review
 LOGDIR=$INTR/logs
 BKP=$INTR/backup
+RESOURCE=$INTR/resources
+FILES=$INTR/files
 
 today="$(date +"%Y%m%d%H%M")"
 USER=`whoami`
@@ -223,6 +259,7 @@ mkdir -p $INTR/scripts
 mkdir -p $INTR/hivechecks
 mkdir -p $INTR/logs
 mkdir -p $INTR/backup
+mkdir -p $INTR/resources
 
 
 ############################################################################################################
@@ -245,25 +282,28 @@ ishive=`grep -w "HIVE" $INTR/files/services.txt`
 iskerberos=`grep -w "KERBEROS" $INTR/files/services.txt`
 isoozie=`grep -w "OOZIE" $INTR/files/services.txt`
 isatlas=`grep -w "ATLAS" $INTR/files/services.txt`
+isams=`grep -w "AMBARI_METRICS" $INTR/files/services.txt`
+
 
 if [ -z "$isatlas" ]
-then
-   :
+	then
+  	 :
 else
-if ! [ -x "$(command -v hbase)" ]; then
-  echo -e "\e[31mError: hbase client is not installed.\e[0m"
-  exit 1
-fi
+	if ! [ -x "$(command -v hbase)" ]; then
+ 	 echo -e "\e[31mError: hbase client is not installed.\e[0m"
+  	 exit 1
+	fi
 fi
 
+
 if [ -z "$iskerberos" ]
-then
-   :
+	then
+   		:
 else
-   if ! [ -x "$(command -v kinit)" ]; then
-   echo -e "\e[31mError: Kerberos client is not installed.\e[0m"
-   exit 1
-  fi
+   	if ! [ -x "$(command -v kinit)" ]; then
+   		echo -e "\e[31mError: Kerberos client is not installed.\e[0m"
+  		exit 1
+  	fi
 fi
 
 
@@ -275,16 +315,29 @@ else
 
   if [ -z "$RANGERPASSWORD" ]
   then
-   echo -e "\e[31mRanger Database password is not provided but Ranger_KMS is installed \nWill skip Ranger Database backup and Database Compatibility check\e[0m"
+   echo -e "\e[31mRanger Database password is not provided but Ranger is installed \nWill skip Ranger Database backup and Database Compatibility check\e[0m"
    while true; do
     read -p $'\e[96mPlease confirm if you still want to continue (y/n) ? :\e[0m' yn
     case $yn in
-        [Yy]* ) echo -e "" ; break;;
+        [Yy]* ) echo -e "" ; 
+        		skipranger=yes;
+        		break;;
         [Nn]* ) exit;;
         * ) echo "Please answer yes or no.";;
     esac
    done
    fi
+ 
+ranger_dbhost=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=RANGER" | grep -w db_host | awk -F ':' '{print $2}' | awk -F '"' '{print $2}' | tail -1)
+ranger_dbflavour=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=RANGER" | grep -w DB_FLAVOR | awk -F ':' '{print $2}' | awk -F '"' '{print $2}' | tail -1)
+ranger_dbname=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=RANGER" | grep -w db_name | awk -F ':' '{print $2}' | awk -F '"' '{print $2}' | tail -1)
+ranger_dbuser=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=RANGER" | grep -w db_user | awk -F ':' '{print $2}' | awk -F '"' '{print $2}' | tail -1)
+
+echo -e "ranger_dbhost=$ranger_dbhost" >> $FILES/clusterconfig.properties
+echo -e "ranger_dbflavour=$ranger_dbflavour" >> $FILES/clusterconfig.properties
+echo -e "ranger_dbname=$ranger_dbname" >> $FILES/clusterconfig.properties
+echo -e "ranger_dbuser=$ranger_dbuser" >> $FILES/clusterconfig.properties
+   
 fi
 
 
@@ -300,12 +353,26 @@ else
    while true; do
     read -p $'\e[96mPlease confirm if you still want to continue (y/n) ? :\e[0m' yn
     case $yn in
-        [Yy]* ) echo -e "" ; break;;
+        [Yy]* ) echo -e "" ; 
+        		skiprangerkms=yes;
+        		break;;
         [Nn]* ) exit;;
         * ) echo "Please answer yes or no.";;
     esac
    done
    fi
+
+ranger_kmsdbhost=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=RANGER_KMS" | grep -w db_host | awk -F ':' '{print $2}' | awk -F '"' '{print $2}' | tail -1)
+ranger_kmsdbflavour=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=RANGER_KMS" | grep -w DB_FLAVOR | awk -F ':' '{print $2}' | awk -F '"' '{print $2}' | tail -1)
+ranger_kmsdbname=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=RANGER_KMS" | grep -w db_name | awk -F ':' '{print $2}' | awk -F '"' '{print $2}' | tail -1)
+ranger_kmsdbuser=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=RANGER_KMS" | grep -w db_user | awk -F ':' '{print $2}' | awk -F '"' '{print $2}' | tail -1)
+
+echo -e "ranger_kmsdbhost=$ranger_kmsdbhost" >> $FILES/clusterconfig.properties
+echo -e "ranger_kmsdbflavour=$ranger_kmsdbflavour" >> $FILES/clusterconfig.properties
+echo -e "ranger_kmsdbname=$ranger_kmsdbname" >> $FILES/clusterconfig.properties
+echo -e "ranger_kmsdbuser=$ranger_kmsdbuser" >> $FILES/clusterconfig.properties
+   
+
 fi
 
 
@@ -321,12 +388,27 @@ else
    while true; do
     read -p $'\e[96mPlease confirm if you still want to continue (y/n) ? :\e[0m' yn
     case $yn in
-        [Yy]* ) echo -e "" ; break;;
-        [Nn]* ) exit;;
+        [Yy]* ) echo -e "" ; 
+        		skipoozie=yes;	
+                break;;
+        [Nn]* ) echo -e "\e[96mPlease configure Oozie database password by passing parameter -OP or --oozie_pwd  \e[0m"
+        		exit;;
         * ) echo "Please answer yes or no.";;
     esac
    done
    fi
+
+ooziejdbcuri=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=OOZIE" |  grep oozie.service.JPAService.jdbc.url | tail -1 | awk -F ' : ' '{print $2}' | awk -F '"' '{print $2}')
+oozie_dbname=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=OOZIE" | grep -w oozie.db.schema.name | tail -1 | awk -F ' : ' '{print $2}' | awk -F '"' '{print $2}')
+oozie_dbhost=`echo $ooziejdbcuri | awk -F '/' '{print $3}'`
+oozie_dbflavour=`echo $ooziejdbcuri | awk -F ':' '{print $2}'`
+oozie_dbuser=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=OOZIE" | grep -w oozie.service.JPAService.jdbc.username | awk -F ':' '{print $2}' | awk -F '"' '{print $2}' | tail -1)
+
+echo -e "oozie_dbhost=$oozie_dbhost" >> $FILES/clusterconfig.properties
+echo -e "oozie_dbflavour=$oozie_dbflavour" >> $FILES/clusterconfig.properties
+echo -e "oozie_dbname=$oozie_dbname" >> $FILES/clusterconfig.properties
+echo -e "oozie_dbuser=$oozie_dbuser" >> $FILES/clusterconfig.properties
+
 fi
 
 
@@ -335,19 +417,21 @@ if [ -z "$ishive" ]
 then
    :
 else
-# echo -en "\e[96mChecking if Password for Hive Metastore Database is available:\e[0m\n"
- if [ -z "$hms_dbpwd" ]
-  then
-   echo -e "\e[31mHive Metastore Database is not passed \nHive has major changes, please configure password by passing -HMS or --hms parameter \e[0m"
-   while true; do
-    read -p $'\e[96mPlease confirm if you still want to continue (y/n) ? :\e[0m' yn
-    case $yn in
-        [Yy]* ) echo -e "" ; break;;
-        [Nn]* ) exit;;
-        * ) echo "Please answer yes or no.";;
-    esac
-   done
-   fi
+	# echo -en "\e[96mChecking if Password for Hive Metastore Database is available:\e[0m\n"
+ 	if [ -z "$hms_dbpwd" ]
+ 	then
+   		echo -e "\e[31mHive Metastore Database is not passed \nHive has major changes, please configure password by passing -HMS or --hms parameter \e[0m"
+   		while true; do
+    		read -p $'\e[96mPlease confirm if you still want to continue (y/n) ? :\e[0m' yn
+    		case $yn in
+       		 	[Yy]* ) echo -e "" ; 
+        				skiphive=yes;
+       		    		break;;
+        		[Nn]* ) exit;;
+        		* ) echo "Please answer yes or no.";;
+    		esac
+   		done
+   	fi
 
 # echo -e "\n\e[1mHiveServer2 JDBC URI should be the exact string used to connect using beeline \nFor example: jdbc:hive2://c1110-node4.coelab.cloudera.com:10000/ \e[21m\n "
 # echo -en "\e[96mPlease enter the JBDC URI for HiveServer2: \e[0m"
@@ -356,20 +440,18 @@ else
  
  
    if ! [ -x "$(command -v hive)" ]; then
-   echo -e "\e[31mError: hiveclient is not installed.\e[0m"
-   echo -e "\e[96mPREREQ - 8. HIVE CHECK\e[0m Will not give expected results.\n \e[1mPlease Install Hive Client on this node\e[21m\n"
+   		echo -e "\e[31mError: hiveclient is not installed.\e[0m"
+   		echo -e "\e[96mPREREQ - 8. HIVE CHECK\e[0m Will not give expected results.\n \e[1mPlease Install Hive Client on this node\e[21m\n"
+   		while true; do
+    		read -p $'\n\e[96mDo You Still Wish to Proceed without (y/n) ? :\e[0m' yn
+    		case $yn in
+        		[Yy]* )  echo -e "\e[31mOK! Please note HIVE 3 has major changes !!! \e[0m" ; break;;
+        		[Nn]* )  exit ; break;;
+        		 * ) echo "Please answer yes or no.";;
+    		esac
+    	done
    
-   
-   while true; do
-    read -p $'\n\e[96mDo You Still Wish to Proceed without (y/n) ? :\e[0m' yn
-    case $yn in
-        [Yy]* )  echo -e "\e[31mOK! Please note HIVE 3 has major changes !!! \e[0m" ; break;;
-        [Nn]* )  exit ; break;;
-        * ) echo "Please answer yes or no.";;
-    esac
-    done
-   
-   fi
+	fi
 
 
 
@@ -380,12 +462,18 @@ else
 ############################################################################################################
 
 
-hmsjdbc=$(curl -s -u $LOGIN:$PASSWORD --insecure $PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=HIVE | grep -w "javax.jdo.option.ConnectionURL" -A1 | tail -2 )
-hive_database_name=$(curl -s -u admin:amankumbare --insecure http://172.25.41.64:8080/api/v1/clusters/c3110/configurations/service_config_versions?service_name=HIVE | grep hive_database_name | awk -F ':' '{print $2}' |  awk -F '"' '{print $2}' | tail -1 )
-hms_jdbc_uri=`echo $hmsjdbc | awk -F ',' '{print $1}' | awk -F '"' '{print $4}' | cut -d? -f1`
-hmsdb_user=`echo $hmsjdbc |  awk -F ',' '{print $2}' | awk -F ':' '{print $2}' | awk -F '"' '{print $2}'`
-hms_dtype=`echo $hms_jdbc_uri | awk -F ':' '{print $2}'`
-hms_dbhost=`echo $hms_jdbc_uri | awk -F '/' '{print $3}'`
+	hmsjdbc=$(curl -s -u $LOGIN:$PASSWORD --insecure $PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=HIVE | grep -w "javax.jdo.option.ConnectionURL" -A1 | tail -2 )
+	hive_database_name=$(curl -s -u $LOGIN:$PASSWORD --insecure $PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=HIVE | grep hive_database_name | awk -F ':' '{print $2}' |  awk -F '"' '{print $2}' | tail -1 )
+	hms_jdbc_uri=`echo $hmsjdbc | awk -F ',' '{print $1}' | awk -F '"' '{print $4}' | cut -d? -f1`
+	hmsdb_user=`echo $hmsjdbc |  awk -F ',' '{print $2}' | awk -F ':' '{print $2}' | awk -F '"' '{print $2}'`
+	hms_dtype=`echo $hms_jdbc_uri | awk -F ':' '{print $2}'`
+	hms_dbhost=`echo $hms_jdbc_uri | awk -F '/' '{print $3}'`
+
+	echo -e "hms_dbhost=$hms_dbhost" >> $FILES/clusterconfig.properties
+	echo -e "hms_dtype=$hms_dtype" >> $FILES/clusterconfig.properties
+	echo -e "hive_database_name=$hive_database_name" >> $FILES/clusterconfig.properties
+	echo -e "hmsdb_user=$hmsdb_user" >> $FILES/clusterconfig.properties
+
 
 # Function to create config.yaml file
 create_payload ()
@@ -411,42 +499,42 @@ queries:
         override: \"%\""
 } > $HIVECFG/config.yaml
 
-if [ ! -f $HIVECFG/config.yaml ]; then
-     echo -e "\e[31mUnable to Find config.yaml ! \e[0m"
-     echo -e "\e[1mConfiguring config.yaml for hive table check in $HIVECFG/config.yaml \e[21m \n"
-     create_payload  $hms_jdbc_uri $hmsdb_user $hms_dbpwd $hs2jdbcuri
+	if [ ! -f $HIVECFG/config.yaml ]; then
+    	 echo -e "\e[31mUnable to Find config.yaml ! \e[0m"
+    	 echo -e "\e[1mConfiguring config.yaml for hive table check in $HIVECFG/config.yaml \e[21m \n"
+     	create_payload  $hms_jdbc_uri $hmsdb_user $hms_dbpwd $hs2jdbcuri
     
-fi
+	fi
 
-if  [ "$hms_dtype" == "mysql" ];then
+	if  [ "$hms_dtype" == "mysql" ];then
 
- 	if [ ! -f /usr/share/java/mysql-connector-java.jar ] ; then
-     	 echo -e "\e[31mUnable to Find Mysql JDBC jar ! \e[0m"
-    	 echo -e "\e[1mInstalling Mysql JDBC package\e[21m \n"
-    	 yum install mysql-connector-java* -y &> $LOGDIR/hivetablescan-$today.log ; sleep 10 ;cp /usr/share/java/mysql-connector-java.jar $HIVECFG/mysql-connector-java.jar
- 	else 
-    	 cp /usr/share/java/mysql-connector-java.jar $HIVECFG/mysql-connector-java.jar
- 	fi
+ 		if [ ! -f /usr/share/java/mysql-connector-java.jar ] ; then
+     	 	echo -e "\e[31mUnable to Find Mysql JDBC jar ! \e[0m"
+    	 	echo -e "\e[1mInstalling Mysql JDBC package\e[21m \n"
+    	 	yum install mysql-connector-java* -y &> $LOGDIR/hivetablescan-$today.log ; sleep 10 ;cp /usr/share/java/mysql-connector-java.jar $HIVECFG/mysql-connector-java.jar
+ 		else 
+    	 	cp /usr/share/java/mysql-connector-java.jar $HIVECFG/mysql-connector-java.jar
+ 		fi
 
-elif  [ "$hms_dtype" == "postgresql" ];then
+	elif  [ "$hms_dtype" == "postgresql" ];then
 
-  	if [ ! -f /usr/share/java/postgresql-jdbc.jar ]; then
-     	 echo -e "\e[31mUnable to Find Postgresql JDBC jar ! \e[0m"
-    	 echo -e "\e[1mInstalling Postgresql JDBC package\e[21m \n"
-     	 yum install postgresql-jdbc* -y &> $LOGDIR/hivetablescan-$today.log ; sleep 10 ; cp /usr/share/java/postgresql-jdbc.jar $HIVECFG/postgresql-jdbc.jar
-    else 
-     	 cp /usr/share/java/postgresql-jdbc.jar $HIVECFG/postgresql-jdbc.jar
-  	fi
-else 
-    echo -e "\e[31mPlease configure JDBC jar for $hms_dtype to connect to HiveMetasore\e[0m"
+  		if [ ! -f /usr/share/java/postgresql-jdbc.jar ]; then
+     	 	echo -e "\e[31mUnable to Find Postgresql JDBC jar ! \e[0m"
+    	 	echo -e "\e[1mInstalling Postgresql JDBC package\e[21m \n"
+     	 	yum install postgresql-jdbc* -y &> $LOGDIR/hivetablescan-$today.log ; sleep 10 ; cp /usr/share/java/postgresql-jdbc.jar $HIVECFG/postgresql-jdbc.jar
+    	else 
+     	 	cp /usr/share/java/postgresql-jdbc.jar $HIVECFG/postgresql-jdbc.jar
+  		fi
+	else 
+    	echo -e "\e[31mPlease configure JDBC jar for $hms_dtype to connect to HiveMetasore\e[0m"
     
-fi
+	fi
 
-if [ ! -f $HIVECFG/hive-sre-shaded.jar ]; then
- echo -e "\e[31m hive-sre-shaded.jar is not available \e[0m"
-  echo -e "\e[1m Dwonloading hive-sre-shaded.jar file from : https://github.com/dstreev/cloudera_upgrade_utils/releases \e[21m"
-  wget -P $HIVECFG/ https://github.com/dstreev/cloudera_upgrade_utils/releases/download/2.0.4.0-SNAPSHOT/hive-sre-shaded.jar &>/dev/null
-fi
+	if [ ! -f $HIVECFG/hive-sre-shaded.jar ]; then
+ 		echo -e "\e[31m hive-sre-shaded.jar is not available \e[0m"
+  		echo -e "\e[1m Dwonloading hive-sre-shaded.jar file from : https://github.com/dstreev/cloudera_upgrade_utils/releases \e[21m"
+  		wget -P $HIVECFG/ https://github.com/dstreev/cloudera_upgrade_utils/releases/download/2.0.4.0-SNAPSHOT/hive-sre-shaded.jar &>/dev/null
+	fi
 
 ## Exiting Hive check Loop
 fi
@@ -464,15 +552,29 @@ echo -e "\e[35m########################################################\e[0m\n"
 # Do not change the order of the section marked with *******
 ############################################################################################################
 
-echo -e "\e[96mPREREQ - 1. Ambari Backup :\e[0m  \e[1m Ambari Backup and Config\e[21m \n 1. Taking Backup of ambari.properties \n 2. Taking Backup of ambari-env.sh \n 3. Checking if Namenode Service Timeout Is Configured? \n"
+if [ -z "$PWDSSH" ];then
+   while true; do
+    read -p $'\e[96mPlease confirm if password less SSH is configured between Ambari, Ranger, RangerKMS, Oozie, Druid database and this node:(y/n) ? :\e[0m' yn
+    case $yn in
+        [Yy]* )  export PWDSSH=y ; break;;
+        [Nn]* )  export PWDSSH=n ; break;;
+        * ) echo "Please answer yes(y) or no(n).";;
+    esac
+    done  
+fi
 
-while true; do
+echo -e "\e[96mPREREQ - 1. Ambari Backup :\e[0m  \e[1m Ambari Backup and Config\e[21m \n 1. Taking Backup of ambari database \n 2. Taking Backup of ambari.properties \n 3. Taking Backup of ambari-env.sh \n 4. Checking if Namenode Service Timeout Is Configured? \n"
+
+  
+if  [ "$PWDSSH" == "y" ];then
+  while true; do
     read -p $'\e[96mWe will need to start and stop Ambari. Please confirm if we should proceed (y/n) ? :\e[0m' yn
     case $yn in
-        [Yy]* ) sh -x  $SCRIPTDIR/ambaribkp.sh $AMBARI_HOST $BKP $today $INTR $REVIEW &> $LOGDIR/ambaribkp-$today.log & 
-				#sh -x  $SCRIPTDIR/ambaribkp.sh $AMBARI_HOST $BKP $today $REVIEW &> $LOGDIR/ambaribkp-$today.log &
+        [Yy]* ) sh -x $SCRIPTDIR/ambaribkp.sh $AMBARI_HOST $BKP $today $INTR $REVIEW &> $LOGDIR/ambaribkp-$today.log & 
+				#sh -x $SCRIPTDIR/ambaribkp.sh $AMBARI_HOST $BKP $today $REVIEW &> $LOGDIR/ambaribkp-$today.log &
 				echo -e "Please check the logs in the file: \e[1m $LOGDIR/ambaribkp-$today.log \e[21m \n"
-				echo -e "Backup of Ambari Database, ambari.properties, and ambari-env.sh is available in:\e[1m $BKP \e[21m Directory\n"
+				echo -e "Backup of ambari.properties, and ambari-env.sh is available in:\e[1m $BKP \e[21m Directory"
+				echo -e "Backup of Ambari Database is available in root directory of:\e[1m $AMBARI_HOST \e[21m\n"
 
 		        echo -e "\e[35m########################################################\e[0m\n"
 
@@ -484,14 +586,102 @@ while true; do
 				# Increase time for large clusters
 				echo -e "\e[1mWaiting for a minute for Ambari to Start & receive heatbeats from all agents\e[21m"
 				# Increase time for large clusters
-				sleep 60  
+				sleep 90  
 				break;;
-        [Nn]* ) echo "Okay !! We will skip backup of Ambari Database, ambari.properties and ambari-env " 
+        [Nn]* ) echo -e  "Please take a backup of \n1. Ambari Database: \n- Stop Ambari Server \n- Run below command from node $AMBARI_HOST\nFor Mysql: mysqldump -u ambariuser -pambaripwd ambaridb >  ambari-database-backup.sql \nFor Psql : pg_dump -U ambariuser ambaridb > ambari-database-backup.sql \n- Start Ambari Server\n"
+  			    echo -e  "2. ambari.properties"
+   		   		echo -e  "3. ambari-env"
+  			    echo -e  "4. Please add upgrade.parameter.nn-restart.timeout based on the time of required to start namenode in /etc/ambari-server/conf/ambari.properties file on the Ambari Server host"
+   
+   
+  			    echo -e  "Please take a backup of \n1. Ambari Database: \n- Stop Ambari Server \n- Run below command from node $AMBARI_HOST\nFor Mysql: mysqldump -u ambariuser -pambaripwd ambaridb >  ambari-database-backup.sql \nFor Psql : pg_dump -U ambariuser ambaridb > ambari-database-backup.sql \n- Start Ambari Server\n"  >> $REVIEW/servicecheck/ambari-$today.out
+   				echo -e  "2. ambari.properties"  >> $REVIEW/servicecheck/ambari-$today.out
+   				echo -e  "3. ambari-env"  >> $REVIEW/servicecheck/ambari-$today.out
+   				echo -e  "4. Please add upgrade.parameter.nn-restart.timeout based on the time of required to start namenode in /etc/ambari-server/conf/ambari.properties file on the Ambari Server host" >> $REVIEW/servicecheck/ambari-$today.out
+   				echo -e "Output is available in file:\e[1m $REVIEW/servicecheck/ambari-$today.out \e[21m" 
         		break;;
         * ) echo "Please answer yes or no.";;
-    esac
-done
+      esac
+   done
+else
+   echo -e  "Please take a backup of \n1. Ambari Database: \n- Stop Ambari Server \n- Run below command from node $AMBARI_HOST\nFor Mysql: mysqldump -u ambariuser -pambaripwd $ambaridb >  ambari-database-backup.sql \nFor Psql : pg_dump -U ambariuser ambaridb > ambari-database-backup.sql \n- Start Ambari Server\n"
+   echo -e  "2. ambari.properties"
+   echo -e  "3. ambari-env"
+   echo -e  "4. Please add upgrade.parameter.nn-restart.timeout based on the time of required to start namenode in /etc/ambari-server/conf/ambari.properties file on the Ambari Server host"
+   
+   
+   echo -e  "Please take a backup of \n1. Ambari Database: \n- Stop Ambari Server \n- Run below command from node $AMBARI_HOST\nFor Mysql: mysqldump -u ambariuser -pambaripwd ambaridb >  ambari-database-backup.sql \nFor Psql : pg_dump -U ambariuser ambaridb > ambari-database-backup.sql \n- Start Ambari Server\n"  >> $REVIEW/servicecheck/ambari-$today.out
+   echo -e  "2. ambari.properties"  >> $REVIEW/servicecheck/ambari-$today.out
+   echo -e  "3. ambari-env"  >> $REVIEW/servicecheck/ambari-$today.out
+   echo -e  "4. Please add upgrade.parameter.nn-restart.timeout based on the time of required to start namenode in /etc/ambari-server/conf/ambari.properties file on the Ambari Server host" >> $REVIEW/servicecheck/ambari-$today.out
+   
+   echo -e "Output is available in file:\e[1m $REVIEW/servicecheck/ambari-$today.out \e[21m"
+fi
+echo -e "\e[35m########################################################\e[0m\n"
 
+############################################################################################################
+#
+# 						BACKPUP : RANGER-KMS-DB
+#
+# 2. works with PGSQL and MYSQL
+# 3. Need to test to for mariadb and oracle
+# 3. Need DB password as user input values
+############################################################################################################
+
+#israngerkms=`grep -wi "RANGER_KMS" $INTR/files/services.txt | tr -s '\n ' ','`
+israngerkms=${israngerkms%,}
+
+if [ -z "$israngerkms" ]
+then
+	echo -e "\n\e[32mRanger_KMS Is Not Installed, Skipping \e[0m \e[96mPREREQ - 3. Ranger_KMS Database Backup\e[0m"
+else
+	if [ "$skiprangerkms" != "yes" ];then
+
+#ranger_kmsdbhost=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=RANGER_KMS" | grep -w db_host | awk -F ':' '{print $2}' | awk -F '"' '{print $2}' | tail -1)
+#ranger_kmsdbflavour=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=RANGER_KMS" | grep -w DB_FLAVOR | awk -F ':' '{print $2}' | awk -F '"' '{print $2}' | tail -1)
+#ranger_kmsdbname=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=RANGER_KMS" | grep -w db_name | awk -F ':' '{print $2}' | awk -F '"' '{print $2}' | tail -1)
+#ranger_kmsdbuser=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=RANGER_KMS" | grep -w db_user | awk -F ':' '{print $2}' | awk -F '"' '{print $2}' | tail -1)
+
+		if  [ "$PWDSSH" == "y" ];then
+ 			 while true; do
+    			read -p $'\e[96mWe will need to stop and start Ranger_KMS for Database Backup. Please confirm if we should proceed (y/n) ? :\e[0m' yn
+    			case $yn in
+    				[Yy]* ) echo -e "\n\e[96mPREREQ - 3. Ranger_KMS Database \e[0m \e[1mTaking Backup of Ranger_KMS DB\e[21m"
+							sh -x $SCRIPTDIR/ranger_kmsdatabasebkp.sh $AMBARI_HOST $cluster_name $today $RANGER_KMS_PASSWORD $PROTOCOL $LOGIN $PASSWORD $PORT $FILES/clusterconfig.properties &> $LOGDIR/ranger_kms_databasebkp-$today.log &
+        					sh -x $SCRIPTDIR/ranger_kmsdatabaseversion.sh $today $INTR  $FILES/clusterconfig.properties $RANGER_KMS_PASSWORD  &> $LOGDIR/ranger_kmsdb-version-$today.log &        		
+        					echo -e "\e[1mRanger_KMS DB backup is available in Root directory of $ranger_kmsdbhost \e[21m"
+        					echo -e "\e[1mRanger_KMS DB backup is available in Root directory of $ranger_kmsdbhost \e[21m"  >> $BKP/database_bkp-$today.out		      		
+							echo -e "Please check the logs in the file: \e[1m$LOGDIR/ranger_kms_databasebkp-$today.log & $LOGDIR/ranger_kmsdb-version-$today.log \e[21m  \n"
+							echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"
+							break;;
+					[Nn]* ) echo -e "\n\e[96mPREREQ - 3. Ranger_KMS Database \e[0m \e[1mTaking Backup of Ranger_KMS DB\e[21m"
+        					sh -x $SCRIPTDIR/ranger_kmsdatabaseversion.sh $today $INTR  $FILES/clusterconfig.properties $RANGER_KMS_PASSWORD  &> $LOGDIR/ranger_kmsdb-version-$today.log &        		
+                			echo -e "\e[1mPlease take a backup of Ranger_KMS Database manually on $ranger_kmsdbhost \n- For mysql : mysqldump -u $ranger_kmsdbuser -p$RANGER_KMS_PASSWORD $ranger_kmsdbname > rangerkmsdb.sql \n- For Psql: PGPASSWORD=$RANGER_KMS_PASSWORD  pg_dump -p 5432 -U $ranger_kmsdbuser  $ranger_kmsdbname > rangerkmsdb.sql  \e[21m"
+               				echo -e "\e[1mPlease take a backup of Ranger_KMS Database manually on $ranger_kmsdbhost \n- For mysql : mysqldump -u $ranger_kmsdbuser -p$RANGER_KMS_PASSWORD $ranger_kmsdbname > rangerkmsdb.sql \n- For Psql: PGPASSWORD=$RANGER_KMS_PASSWORD  pg_dump -p 5432 -U $ranger_kmsdbuser  $ranger_kmsdbname > rangerkmsdb.sql  \e[21m" >> $BKP/database_bkp-$today.out		
+							echo -e "Please check the logs in the file: \e[1m$LOGDIR/ranger_kmsdb-version-$today.log \e[21m  \n"
+							echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"					 
+        					break;;
+        			* ) echo "Please answer yes or no.";;
+      			esac
+   			done
+		else
+
+			echo -e "\n\e[96mPREREQ - 3. Ranger_KMS Database \e[0m \e[1mTaking Backup of Ranger_KMS DB\e[21m"
+        	sh -x $SCRIPTDIR/ranger_kmsdatabaseversion.sh $today $INTR  $FILES/clusterconfig.properties $RANGER_KMS_PASSWORD &> $LOGDIR/ranger_kmsdb-version-$today.log &        		
+            echo -e "\e[1mPlease take a backup of Ranger_KMS Database manually on $ranger_kmsdbhost \n- For mysql : mysqldump -u $ranger_kmsdbuser -p$RANGER_KMS_PASSWORD $ranger_kmsdbname > rangerkmsdb.sql \n- For Psql: PGPASSWORD=$RANGER_KMS_PASSWORD  pg_dump -p 5432 -U $ranger_kmsdbuser  $ranger_kmsdbname > rangerkmsdb.sql  \e[21m"
+            echo -e "\e[1mPlease take a backup of Ranger_KMS Database manually on $ranger_kmsdbhost \n- For mysql : mysqldump -u $ranger_kmsdbuser -p$RANGER_KMS_PASSWORD $ranger_kmsdbname > rangerkmsdb.sql \n- For Psql: PGPASSWORD=$RANGER_KMS_PASSWORD  pg_dump -p 5432 -U $ranger_kmsdbuser  $ranger_kmsdbname > rangerkmsdb.sql  \e[21m" >> $BKP/database_bkp-$today.out		
+			echo -e "Please check the logs in the file: \e[1m$LOGDIR/ranger_kmsdb-version-$today.log \e[21m  \n"				
+				echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"			
+
+		fi
+
+	else
+ 		 echo -e "\e[31mSkipping Ranger KMS check as Ranger_KMS Database password is not configured\e[0m"
+
+	fi
+
+fi
+####exiting [ -z "$israngerkms" ]
 
 echo -e "\e[35m########################################################\e[0m\n"
 
@@ -510,38 +700,58 @@ isranger=${isranger%,}
 
 if [ -z "$isranger" ]
 then
-echo -e "\n\e[32mRanger Is Not Installed, Skipping \e[0m \e[96mPREREQ - 2. Ranger Database Backup\e[0m"
-
+	echo -e "\n\e[32mRanger Is Not Installed, Skipping \e[0m \e[96mPREREQ - 2. Ranger Database Backup\e[0m"
 else
-echo -e "\n\e[96mPREREQ -2. Ranger Database \e[0m \e[1mTaking Backup of Ranger DB\e[21m"
-sh  $SCRIPTDIR/rangerdatabasebkp.sh $AMBARI_HOST $cluster_name $today $RANGERPASSWORD $PROTOCOL $LOGIN $PASSWORD $INTR $PORT &> $LOGDIR/rangerdatabasebkp-$today.log &
-echo -e "\e[1mRanger_KMS DB back is available in: $BKP/rangerdbbkpi$today.sql \e[21m"
-echo -e "Please check the logs in the file: \e[1m$LOGDIR/rangerdatabasebkp-$today.log \e[21m  \n"
+
+	if [ "$skipranger" != "yes" ];then
+#ranger_dbhost=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=RANGER" | grep -w db_host | awk -F ':' '{print $2}' | awk -F '"' '{print $2}' | tail -1)
+#ranger_dbflavour=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=RANGER" | grep -w DB_FLAVOR | awk -F ':' '{print $2}' | awk -F '"' '{print $2}' | tail -1)
+#ranger_dbname=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=RANGER" | grep -w db_name | awk -F ':' '{print $2}' | awk -F '"' '{print $2}' | tail -1)
+#ranger_dbuser=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=RANGER" | grep -w db_user | awk -F ':' '{print $2}' | awk -F '"' '{print $2}' | tail -1)
+
+			if  [ "$PWDSSH" == "y" ];then
+  				while true; do
+   				 read -p $'\e[96mWe will need to stop and start Ranger for Database Backup. Please confirm if we should proceed (y/n) ? :\e[0m' yn
+    			 case $yn in
+        				[Yy]* ) echo -e "\n\e[96mPREREQ -2. Ranger Database \e[0m \e[1mTaking Backup of Ranger DB\e[21m"
+                				sh -x $SCRIPTDIR/rangerdatabasebkp.sh $AMBARI_HOST $cluster_name $today $RANGERPASSWORD $PROTOCOL $LOGIN $PASSWORD $PORT $FILES/clusterconfig.properties &> $LOGDIR/rangerdatabasebkp-$today.log &
+        						sh -x $SCRIPTDIR/rangerdatabaseversion.sh $today $INTR $FILES/clusterconfig.properties $RANGERPASSWORD &> $LOGDIR/rangerdb-version-$today.log &        		
+        						echo -e "\e[1mRanger DB backup is available in Root directory of $ranger_dbhost \e[21m"
+        						echo -e "\e[1mRanger DB backup is available in Root directory of $ranger_dbhost \e[21m" >> $BKP/database_bkp-$today.out
+								echo -e "Please check the logs in the file: \e[1m$LOGDIR/rangerdatabasebkp-$today.log & $LOGDIR/rangerdb-version-$today.log \e[21m  \n"	
+								echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"			
+								break;;
+        				[Nn]* ) echo -e "\n\e[96mPREREQ -2. Ranger Database \e[0m \e[1mTaking Backup of Ranger DB\e[21m"
+        						sh -x $SCRIPTDIR/rangerdatabaseversion.sh $today $RANGERPASSWORD $INTR $FILES/clusterconfig.properties $RANGERPASSWORD  &> $LOGDIR/rangerdb-version-$today.log & 
+                				echo -e "\e[1mPlease take a backup of Ranger Database manually on $ranger_dbhost \n- For mysql : mysqldump -u $ranger_dbuser -p$RANGERPASSWORD $ranger_dbname > rangerdb.sql \n- For Psql: PGPASSWORD=$RANGERPASSWORD  pg_dump -p 5432 -U $ranger_dbuser  $ranger_dbname > rangerdb.sql  \e[21m"
+                				echo -e "\e[1mPlease take a backup of Ranger Database manually on $ranger_dbhost \n- For mysql : mysqldump -u $ranger_dbuser -p$RANGERPASSWORD $ranger_dbname > rangerdb.sql \n- For Psql: PGPASSWORD=$RANGERPASSWORD  pg_dump -p 5432 -U $ranger_dbuser  $ranger_dbname > rangerdb.sql  \e[21m" >> $BKP/database_bkp-$today.out      
+								echo -e "Please check the logs in the file: \e[1m$LOGDIR/rangerdb-version-$today.log \e[21m  \n"	        		
+        						echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"
+        						break;;
+        				* ) echo "Please answer yes or no.";;
+      				esac
+   				done
+			else
+
+				echo -e "\n\e[96mPREREQ -2. Ranger Database \e[0m \e[1mTaking Backup of Ranger DB\e[21m"
+        		sh -x $SCRIPTDIR/rangerdatabaseversion.sh $today $INTR $FILES/clusterconfig.properties $RANGERPASSWORD &> $LOGDIR/rangerdb-version-$today.log &        		
+                echo -e "\e[1mPlease take a backup of Ranger Database manually  on $ranger_dbhost \n- For mysql : mysqldump -u $ranger_dbuser -p$RANGERPASSWORD $ranger_dbname > rangerdb.sql \n- For Psql: PGPASSWORD=$RANGERPASSWORD  pg_dump -p 5432 -U $ranger_dbuser  $ranger_dbname > rangerdbbkpi$now.sql  \e[21m"
+                echo -e "\e[1mPlease take a backup of Ranger Database manually on $ranger_dbhost \n- For mysql : mysqldump -u $ranger_dbuser -p$RANGERPASSWORD $ranger_dbname > rangerdb.sql \n- For Psql: PGPASSWORD=$RANGERPASSWORD  pg_dump -p 5432 -U $ranger_dbuser  $ranger_dbname > rangerdb.sql  \e[21m" >> $BKP/database_bkp-$today.out
+				echo -e "Please check the logs in the file: \e[1m$LOGDIR/rangerdb-version-$today.log \e[21m  \n"				
+				echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"
+
+			fi
+
+		else
+  			echo -e "\e[31mSkipping Ranger check as Ranger Database password is not configured\e[0m"
+
+		fi
+
 fi
-echo -e "\e[35m########################################################\e[0m\n"
+####exiting [ -z "$isranger" ] BKP
 
-############################################################################################################
-#
-# 						BACKPUP : RANGER-KMS-DB
-#
-# 2. works with PGSQL and MYSQL
-# 3. Need to test to for mariadb and oracle
-# 3. Need DB password as user input values
-############################################################################################################
+sleep 20
 
-#israngerkms=`grep -wi "RANGER_KMS" $INTR/files/services.txt | tr -s '\n ' ','`
-israngerkms=${israngerkms%,}
-
-if [ -z "$israngerkms" ]
-then
-echo -e "\n\e[32mRanger_KMS Is Not Installed, Skipping \e[0m \e[96mPREREQ - 3. Ranger_KMS Database Backup\e[0m"
-else
-echo -e "\n\e[96mPREREQ - 3. Ranger_KMS Database \e[0m \e[1mTaking Backup of Ranger_KMS DB\e[21m"
-sh  $SCRIPTDIR/ranger_kmsdatabasebkp.sh $AMBARI_HOST $cluster_name $today $RANGER_KMS_PASSWORD $PROTOCOL $LOGIN $PASSWORD $INTR $PORT &> $LOGDIR/ranger_kms_databasebkp-$today.log &
-
-echo -e "\e[1mRanger_KMS DB back is available in: $BKP/ranger_kmsdbbkpi$today.sql \e[21m"
-echo -e "Please check the logs in the file: \e[1m$LOGDIR/ranger_kms_databasebkp-$today.log \e[21m  \n"
-fi
 echo -e "\e[35m########################################################\e[0m\n"
 
 ############################################################################################################
@@ -554,19 +764,63 @@ echo -e "\e[35m########################################################\e[0m\n"
 ############################################################################################################
 
 #israngerkms=`grep -wi "RANGER_KMS" $INTR/files/services.txt | tr -s '\n ' ','`
+
 isoozie=${isoozie%,}
 
 if [ -z "$isoozie" ]
 then
-echo -e "\n\e[32mOozie Is Not Installed, Skipping \e[0m \e[96mPREREQ - 4. Oozie Database Backup\e[0m"
-
+	echo -e "\n\e[32mOozie Is Not Installed, Skipping \e[0m \e[96mPREREQ - 4. Oozie Database Backup\e[0m"
 else
-echo -e "\n\e[96mPREREQ - 4. Oozie Database \e[0m \e[1mTaking Backup of Oozie DB\e[21m"
-sh -x $SCRIPTDIR/ooziedb.sh $AMBARI_HOST $cluster_name $today $OOZIE_PASSWORD $PROTOCOL $LOGIN $PASSWORD $INTR $PORT &> $LOGDIR/oozie_databasebkp-$today.log &
 
-echo -e "\e[1mOozie DB back is available in: $BKP/ooziedbbkpi$today.sql \e[21m"
-echo -e "Please check the logs in the file: \e[1m$LOGDIR/oozie_databasebkp-$today.log \e[21m  \n"
+	if [ "$skipoozie" != "yes" ];then
+
+#ooziejdbcuri=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=OOZIE" |  grep oozie.service.JPAService.jdbc.url | tail -1 | awk -F ' : ' '{print $2}' | awk -F '"' '{print $2}')
+#oozie_dbname=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=OOZIE" | grep -w oozie.db.schema.name | tail -1 | awk -F ' : ' '{print $2}' | awk -F '"' '{print $2}')
+#oozie_dbhost=`echo $ooziejdbcuri | awk -F '/' '{print $3}'`
+#oozie_dbflavour=`echo $ooziejdbcuri | awk -F ':' '{print $2}'`
+#oozie_dbuser=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=OOZIE" | grep -w oozie.service.JPAService.jdbc.username | awk -F ':' '{print $2}' | awk -F '"' '{print $2}' | tail -1)
+
+		if  [ "$PWDSSH" == "y" ];then
+ 			 while true; do
+  		  			read -p $'\e[96mWe will need to stop and start Oozie for Database Backup. Please confirm if we should proceed (y/n) ? :\e[0m' yn
+    				case $yn in
+    					[Yy]* ) echo -e "\n\e[96mPREREQ - 4. Oozie Database \e[0m \e[1mTaking Backup of Oozie DB\e[21m"
+  								sh -x $SCRIPTDIR/ooziedb.sh $AMBARI_HOST $cluster_name $today $OOZIE_PASSWORD $PROTOCOL $LOGIN $PASSWORD $PORT $FILES/clusterconfig.properties &> $LOGDIR/oozie_databasebkp-$today.log &
+  								sh -x $SCRIPTDIR/ooziedatabaseversion.sh $today $INTR $FILES/clusterconfig.properties $OOZIE_PASSWORD &> $LOGDIR/ooziedb-version-$today.log & 
+								echo -e "\e[1mOozie DB backup is available in Root directory of $oozie_dbhost \e[21m"
+        						echo -e "\e[1mOozie DB backup is available in Root directory of $oozie_dbhost \e[21m" >> $BKP/database_bkp-$today.out
+	   		 					echo -e "Please check the logs in the file: \e[1m$LOGDIR/oozie_databasebkp-$today.log & $LOGDIR/ooziedb-version-$today.log \e[21m  \n"	
+	    						echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"			
+								break;;
+
+						[Nn]* ) echo -e "\n\e[96mPREREQ - 4. Oozie Database \e[0m \e[1mTaking Backup of Oozie DB\e[21m"
+  		        				sh -x $SCRIPTDIR/ooziedatabaseversion.sh $today $INTR $FILES/clusterconfig.properties $OOZIE_PASSWORD &> $LOGDIR/ooziedb-version-$today.log & 
+ 		        				echo -e "\e[1mPlease take a backup of Oozie Database manually on $oozie_dbhost \n- For mysql : mysqldump -u $oozie_dbuser -p$OOZIE_PASSWORD $oozie_dbname > ooziedb.sql \n- For Psql: PGPASSWORD=$OOZIE_PASSWORD  pg_dump -p 5432 -U $oozie_dbuser  $oozie_dbname > ooziedb.sql  \e[21m"
+                				echo -e "\e[1mPlease take a backup of Oozie Database manually on $oozie_dbhost \n- For mysql : mysqldump -u $oozie_dbuser -p$OOZIE_PASSWORD $oozie_dbname > ooziedb.sql \n- For Psql: PGPASSWORD=$OOZIE_PASSWORD  pg_dump -p 5432 -U $oozie_dbuser  $oozie_dbname > ooziedb.sql  \e[21m" >> $BKP/database_bkp-$today.out      
+	 		    				echo -e "Please check the logs in the file: \e[1m$LOGDIR/ooziedb-version-$today.log \e[21m \n"	  		
+        						echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"
+        						break;;
+        				* ) echo "Please answer yes or no.";;
+       				esac
+   			done
+		else
+
+			echo -e "\n\e[96mPREREQ - 4. Oozie Database \e[0m \e[1mTaking Backup of Oozie DB\e[21m"
+  			sh -x $SCRIPTDIR/ooziedatabaseversion.sh $today $INTR $FILES/clusterconfig.properties $OOZIE_PASSWORD &> $LOGDIR/ooziedb-version-$today.log & 
+ 		    echo -e "\e[1mPlease take a backup of Oozie Database manually on $oozie_dbhost \n- For mysql : mysqldump -u $oozie_dbuser -p$OOZIE_PASSWORD $ooziedb > ooziedb.sql \n- For Psql: PGPASSWORD=$OOZIE_PASSWORD  pg_dump -p 5432 -U $oozie_dbuser  $oozie_dbname > ooziedb.sql  \e[21m"
+            echo -e "\e[1mPlease take a backup of Oozie Database manually on $oozie_dbhost \n- For mysql : mysqldump -u $oozie_dbuser -p$OOZIE_PASSWORD $oozie_dbname > ooziedb.sql \n- For Psql: PGPASSWORD=$OOZIE_PASSWORD  pg_dump -p 5432 -U $oozie_dbuser  $oozie_dbname > ooziedb.sql  \e[21m" >> $BKP/database_bkp-$today.out      
+        	echo -e "Please check the logs in the file: \e[1m$LOGDIR/ooziedb-version-$today.log \e[21m  \n"
+        	echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"
+		fi
+
+	else
+  		echo -e "\e[31mSkipping Oozie check as Oozie Database password is not configured\e[0m"
+
+	fi
+
 fi
+####exiting [ -z "$isoozie" ]
+
 echo -e "\e[35m########################################################\e[0m\n"
 
 ############################################################################################################
@@ -577,17 +831,20 @@ echo -e "\e[35m########################################################\e[0m\n"
 ############################################################################################################
 
 echo -e "\e[96mPREREQ - 5. Unsupported Services\e[0m \e[1mServices Installed - to be deleted before upgrade\e[21m"
-services=`egrep -i "storm|ACCUMULO|SMARTSENSE|Superset|Flume|Mahout|Falcon|Slider|WebHCat|spark" $INTR/files/services.txt | grep -v -i spark2 | tr -s '\n ' ','`
+dep=`cat $RESOURCE/depricated-cdpdc$CDPDC.properties`
+services=`egrep -wi $dep $INTR/files/services.txt | grep -v -i spark2 | tr -s '\n ' ','`
+#services=`egrep -i "storm|ACCUMULO|SMARTSENSE|Superset|Flume|Mahout|Falcon|Slider|WebHCat|spark" $INTR/files/services.txt | grep -v -i spark2 | tr -s '\n ' ','`
 services=${services%,}
 
 echo -e "\e[31mBelow services are installed in cluster $cluster_name and will be deleted as a part of upgrade:\e[0m  \n \e[1m$services\e[21m\n"
-echo -e "\n\e[31m- You can plan to remove these services before upgarde\e[0m"
+echo -e "\e[31m- You can plan to remove these services before upgarde\e[0m"
 echo -e "\e[31m- Removing Druid and Accumulo services cause data loss\e[0m"
 echo -e "\e[31m- Do not proceed with the upgrade to HDP 7.1.1.0 if you want to continue with Druid and Accumulo services.\e[0m"
-echo -e "\e[31m- Storm can be replaced with Cloudera Streaming Analytics (CSA) powered by Apache Flink. Contact your Cloudera account team for more information about moving from Storm to CSA\e[0m\n"
+echo -e "\e[31m- Storm can be replaced with Cloudera Streaming Analytics (CSA) powered by Apache Flink. Contact your Cloudera account team for more information about moving from Storm to CSA\e[0m"
+echo -e "\e[31m- You must take a backup of the running topology processes if your HDP cluster includes the Storm component.\e[0m"
 echo -e "\e[31m- Flume workloads can be migrated to Cloudera Flow Management (CFM). CFM is a no-code data ingestion and management solution powered by Apache NiFi.\e[0m \n"
 echo -e "########################################################\n" >>  $REVIEW/servicecheck/RemoveServices-$today.out
-echo -e "Below services are installed in cluster $cluster_name and will be deleted as a part of upgrade:  \n $services \n\n * You can plan to remove these services before upgarde \n * Removing the Druid and Accumulo services cause data loss \n * Do not proceed with the upgrade to HDP 7.1.1.0 if you want to continue with Druid and Accumulo services \n * Storm can be replaced with Cloudera Streaming Analytics (CSA) powered by Apache Flink. Contact your Cloudera account team for more information about moving from Storm to CSA \n * Flume workloads can be migrated to Cloudera Flow Management (CFM). CFM is a no-code data ingestion and management solution powered by Apache NiFi\n"  >>  $REVIEW/servicecheck/RemoveServices-$today.out
+echo -e "Below services are installed in cluster $cluster_name and will be deleted as a part of upgrade:  \n $services \n\n * You can plan to remove these services before upgarde \n * Removing the Druid and Accumulo services cause data loss \n * Do not proceed with the upgrade to HDP 7.1.1.0 if you want to continue with Druid and Accumulo services \n * Storm can be replaced with Cloudera Streaming Analytics (CSA) powered by Apache Flink. Contact your Cloudera account team for more information about moving from Storm to CSA \n* You must take a backup of the running topology processes if your HDP cluster includes the Storm component.\n* Flume workloads can be migrated to Cloudera Flow Management (CFM). CFM is a no-code data ingestion and management solution powered by Apache NiFi\n"  >>  $REVIEW/servicecheck/RemoveServices-$today.out
 echo -e "########################################################\n" >>  $REVIEW/servicecheck/RemoveServices-$today.out
 
 #echo -e "\e[35m########################################################\e[0m\n"
@@ -605,14 +862,13 @@ echo -e "\e[96mPREREQ - 6. HDF Mpack Check\e[0m \e[1mChecking If Nifi Is Install
 isnifi=`grep -wi "NIFI" $INTR/files/services.txt | tr -s '\n ' ','`
 isnifi=${isnifi%,}
 
-if [ -z "$isnifi" ]
-then
-echo -e "\e[1mNiFi is not installed in cluster $cluster_name\e[21m"
-echo -e "\e[1mHDF mpack check completed\e[21m\n"
+if [ -z "$isnifi" ];then
+	echo -e "\e[1mNiFi is not installed in cluster $cluster_name\e[21m"
+	echo -e "\e[1mHDF mpack check completed\e[21m\n"
 else
-echo -e "\e[31mHDF Mpack is installed in $cluster_name \n Please remove it before upgrade\e[0m"
-echo -e "HDF Mpack is installed in $cluster_name \n Please remove it before upgrade" >> $REVIEW/servicecheck/RemoveServices-$today.out
-echo -e "\e[1mHDF mpack check completed\e[21m\n"
+	echo -e "\e[31mHDF Mpack is installed in $cluster_name \n Please remove it before upgrade\e[0m"
+	echo -e "HDF Mpack is installed in $cluster_name \n Please remove it before upgrade" >> $REVIEW/servicecheck/RemoveServices-$today.out
+	echo -e "\e[1mHDF mpack check completed\e[21m\n"
 fi
 echo -e "Please check the output in the file:\e[1m$REVIEW/servicecheck/RemoveServices-$today.out\e[21m for the actions to take on components installed in cluster $cluster_name\e[0m \n"
 echo -e "\e[35m########################################################\e[0m\n"
@@ -631,11 +887,11 @@ thirdparty=`egrep -vi "AMBARI_INFRA|FALCON|ZEPPELIN|OOZIE|LOGSEARCH|AMBARI_METRI
 thirdparty=${thirdparty%,}
 
 if [ -z "$thirdparty" ];then
-echo -e "\e[1mThere are no Third Party Services installed on this cluster $cluster_name\e[21m\n"
+	echo -e "\e[1mThere are no Third Party Services installed on this cluster $cluster_name\e[21m\n"
 else
-echo -e "\e[31mBelow Third Party services are installed in cluster $cluster_name \nPlease remove this before upgrade:\e[0m \n\e[1m $thirdparty\e[21m"
-echo -e "Below Third Party services are installed in cluster $cluster_name \nPlease remove below services before upgrade: \n$thirdparty"  >> $REVIEW/servicecheck/third-party-$today.out
-echo -e "\e[1mOutput is available in the file: $REVIEW/servicecheck/third-party-$today.out \e[21m"
+	echo -e "\e[31mBelow Third Party services are installed in cluster $cluster_name \nPlease remove this before upgrade:\e[0m \n\e[1m $thirdparty\e[21m"
+	echo -e "Below Third Party services are installed in cluster $cluster_name \nPlease remove below services before upgrade: \n$thirdparty"  >> $REVIEW/servicecheck/third-party-$today.out
+	echo -e "\e[1mOutput is available in the file: $REVIEW/servicecheck/third-party-$today.out \e[21m"
 fi
 echo -e "\e[35m########################################################\e[0m\n"
 
@@ -651,68 +907,80 @@ echo -e "\e[35m########################################################\e[0m\n"
 # # hdfs dfs -setfacl -R -m user:root:rwx /
 # NEED TO ADD SUPPORT FOR KERBEROS
 ############################################################################################################
+
+
+
+# Checking state of Ranger KMS to avoid failure due to ranger_kms delegation token issue
+if [  -z "$israngerkms" ]
+then
+  echo ""
+else
+echo -e "\e[1mWaiting for Ranger_KMS to be started\e[0m"
+kms_start=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/services/RANGER_KMS?fields=ServiceInfo/state" | grep -v href | grep -w state |  awk -F ' : ' '{print $2}' | awk -F '"' '{print $2}')
+while [ "$kms_start" != "STARTED" ]; do
+kms_start=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/services/RANGER_KMS?fields=ServiceInfo/state" | grep -v href | grep -w state |  awk -F ' : ' '{print $2}' | awk -F '"' '{print $2}')
+	sleep 5
+#	echo $kms_start
+#	echo -e "Wating for Ranger_KMS to start"
+done
+fi 
+
+sleep 20
+echo -e "\e[1mRanger_KMS started successfully\e[0m"
+
+
 if [ -z "$ishive" ]
 then
-echo -e "\e[32m Will Skip\e[0m \e[96mPREREQ - 8. HIVE CHECK\e[0m \e[31m as Hive is not Installed\e[0m"
+	echo -e "\e[32m Will Skip\e[0m \e[96mPREREQ - 8. HIVE CHECK\e[0m \e[31m as Hive is not Installed\e[0m"
 else
-echo -e "\e[96mPREREQ - 8. HIVE CHECK\e[0m \e[1mRunning Hive table check which includes:\e[21m  \n 1. Hive 3 Upgrade Checks - Locations Scan \n 2. Hive 3 Upgrade Checks - Bad ORC Filenames \n 3. Hive 3 Upgrade Checks - Managed Table Migrations ( Ownership check & Conversion to ACID tables) \n 4. Hive 3 Upgrade Checks - Compaction Check \n 5. Questionable Serde's Check \n 6. Managed Table Shadows \n"
-if  [ "$hms_dtype" == "mysql" ];then
+	if [ "$skiphive" != "yes" ];then
+		if  [ "$PWDSSH" == "y" ];then
+  			while true; do
+    			read -p $'\e[96mWe will need to stop and start Hive for Database Backup. Please confirm if we should proceed (y/n) ? :\e[0m' yn
+    			case $yn in
+    				[Yy]* ) echo -e "\e[96mPREREQ - 8. HIVE CHECK\e[0m \e[1m Hive Database Backup\e[21m"
+							sh -x $SCRIPTDIR/hivedbbkp.sh $AMBARI_HOST $cluster_name $today $hms_dbpwd $PROTOCOL $LOGIN $PASSWORD $PORT $FILES/clusterconfig.properties &> $LOGDIR/hive_databasebkp-$today.log &
+  							sh -x $SCRIPTDIR/hivedatabaseversion.sh $today $INTR $FILES/clusterconfig.properties $hms_dbpwd &> $LOGDIR/hivedb-version-$today.log & 
+							echo -e "\e[1mHive DB backup is available in Root directory of $hms_dbhost \e[21m"
+							echo -e "\e[1mHive DB backup is available in Root directory of $hms_dbhost \e[21m" >> $BKP/database_bkp-$today.out
+							echo -e "Please check the logs in the file: \e[1m$LOGDIR/hive_databasebkp-$today.log & $LOGDIR/hivedb-version-$today.log \e[21m  \n"	
+							echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"			
+							break;;
+ 		
 
-    echo -e "\e[1m!!!! Checking HiveMetastore Database Version!!!\e[21m"
-    hmsraw=`mysql -h $hms_dbhost -u $hmsdb_user -p$hms_dbpwd -e "SELECT VERSION();" |grep "\|"`
-    hmsdbv=`echo $hmsraw | awk -F ' ' '{print $2}'`
-    echo "HiveMetastore:$hms_dtype:$hmsdbv" >>  $INTR/files/DB-versioncheck-$today.out
- 	
- 	
- 	echo -e "!!!! Taking Hive DB backup in $INTR/backup/Hivedbbkpi$today.sql  !!!! \n"
-    mysqldump -h $hms_dbhost -u $hmsdb_user -p$hms_dbpwd $hive_database_name > $INTR/backup/Hivedbbkpi$today.sql
+ 					[Nn]* ) echo -e "\e[96mPREREQ - 8. HIVE CHECK\e[0m \e[1m Hive Database Backup\e[21m"
+ 							sh -x $SCRIPTDIR/hivedatabaseversion.sh $today $INTR $FILES/clusterconfig.properties $hms_dbpwd &> $LOGDIR/hivedb-version-$today.log & 
+ 							echo -e "\e[1mPlease take a backup of Hive Database manually on $hms_dbhost \n- For mysql : mysqldump -u $hmsdb_user -p$hms_dbpwd $hive_database_name > hivedb.sql \n- For Psql: PGPASSWORD=$hms_dbpwd  pg_dump -p 5432 -U $ranger_dbuser  $hive_database_name > hivedb.sql  \e[21m"
+             			    echo -e "\e[1mPlease take a backup of Hive Database manually on $hms_dbhost \n- For mysql : mysqldump -u $hmsdb_user -p$hms_dbpwd $hive_database_name > hivedb.sql \n- For Psql: PGPASSWORD=$hms_dbpwd  pg_dump -p 5432 -U $hmsdb_user  $hive_database_name > hivedb.sql  \e[21m" >> $BKP/database_bkp-$today.out      
+        					echo -e "Please check the logs in the file: \e[1m$LOGDIR/hivedb-version-$today.log \e[21m  \n"	
+        					echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"
+        					break;;
+       	 			* ) echo "Please answer yes or no.";;
+       			esac
+  	 		done
+		else
 
-elif  [ "$hms_dtype" == "postgresql" ];then
+				echo -e "\e[96mPREREQ - 8. HIVE CHECK\e[0m \e[1m Hive Database Backup\e[21m"
+ 				sh -x $SCRIPTDIR/hivedatabaseversion.sh $today $INTR $FILES/clusterconfig.properties $hms_dbpwd &> $LOGDIR/hivedb-version-$today.log & 
+ 				echo -e "\e[1mPlease take a backup of Hive Database manually on $hms_dbhost \n- For mysql : mysqldump -u $hmsdb_user -p$hms_dbpwd $hive_database_name > hivedb.sql \n- For Psql: PGPASSWORD=$hms_dbpwd  pg_dump -p 5432 -U $ranger_dbuser  $hive_database_name > hivedb.sql  \e[21m"
+                echo -e "\e[1mPlease take a backup of Hive Database manually on $hms_dbhost \n- For mysql : mysqldump -u $hmsdb_user -p$hms_dbpwd $hive_database_name > hivedb.sql \n- For Psql: PGPASSWORD=$hms_dbpwd  pg_dump -p 5432 -U $hmsdb_user  $hive_database_name > hivedb.sql  \e[21m" >> $BKP/database_bkp-$today.out 
+                echo -e "Please check the logs in the file: \e[1m$LOGDIR/hivedb-version-$today.log \e[21m  \n"	     
+        		echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"
 
-   echo -e "\e[1mChecking HiveMetastore Database Version!!!\e[21m"
-   hmsraw=`PGPASSWORD=$hms_dbpwd psql -h $hms_dbhost -U $hmsdb_user -c 'SHOW server_version;'`
-   hmsdbv=`echo $kmsraw | awk '{print $3}'`
-   echo "HiveMetastore:$hms_dtype:$hmsdbv" >> $INTR/files/DB-versioncheck-$today.out
-   
-   echo -e "!!!! Taking Hive DB backup in $INTR/backup/Hivedbbkpi$today.sql  !!!! \n"
-   PGPASSWORD=$hms_dbpwd  pg_dump -h $hms_dbhost -U $hmsdb_user $hive_database_name > $INTR/backup/Hivedbbkpi$today.sql
+		fi
+			echo -e "\e[96mPREREQ - 8. HIVE CHECK\e[0m \e[1mRunning Hive table check which includes:\e[21m  \n 1. Hive 3 Upgrade Checks - Locations Scan \n 2. Hive 3 Upgrade Checks - Bad ORC Filenames \n 3. Hive 3 Upgrade Checks - Managed Table Migrations ( Ownership check & Conversion to ACID tables) \n 4. Hive 3 Upgrade Checks - Compaction Check \n 5. Questionable Serde's Check \n 6. Managed Table Shadows \n"
+			sh -x $SCRIPTDIR/hiveprereq.sh $INTR/files/hive_databases.txt $HIVECFG $REVIEW/hive  &> $LOGDIR/hivetablescan-$today.log &
+			echo -e "Output is available in \e[1m $REVIEW/hive directory \e[21m"
+			echo -e "Please check the logs in the file:\e[1m $LOGDIR/hivetablescan-$today.log  \e[21m\n"
+			sleep 10
 
-else 
+	else 
+		echo -e "\e[31mSkipping Hive check as Hive Database password is not configured\e[0m"
 
-    echo -e "Add command for checking database version of $hms_dtype"
+	fi
+
 fi
 
-sh -x  $SCRIPTDIR/hiveprereq.sh $INTR/files/hive_databases.txt $HIVECFG  $REVIEW/hive  &> $LOGDIR/hivetablescan-$today.log &
-echo -e "Output is available in \e[1m $REVIEW/hive directory \e[21m"
-echo -e "Please check the logs in the file:\e[1m $LOGDIR/hivetablescan-$today.log   \e[21m\n"
-
-sleep 5
-
-fi
-
-echo -e "\e[35m########################################################\e[0m\n"
-
-
-############################################################################################################
-#
-#                    Atlas Backup
-# 
-#
-############################################################################################################
-if [ -z "$isatlas" ]
-then
-echo -e "\n\e[32mAtlas Is Not Installed, Skipping Skipping\e[0m \e[96mPREREQ - 9. ATLAS BACKUP \e[0m"
-else
-echo -e "\e[96mPREREQ - 9. ATLAS BACKUP\e[0m \e[1mRunning Atlas Backup:\e[21m  \n 1. Hbase table backup \n 2. Shard backup \n"
-
-sh -x  $SCRIPTDIR/atlasbkp.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $PROTOCOL $cluster_name $today $iskerberos &> $LOGDIR/atlasbkp-$today.log &
-echo -e "Please check the logs in file:\e[1m $LOGDIR/atlasbkp-$today.log   \e[21m\n"
-echo -e "Check the status of the applicationsID in file:\e[1m $LOGDIR/atlasbkp-$today.log \e[21m\n"
-echo -e "Backup of hbase tables is stored in HDFS directory /atlasbackup$today   \e[21m\n"
-
-
-sleep 5
-fi
 echo -e "\e[35m########################################################\e[0m\n"
 
 
@@ -722,36 +990,36 @@ echo -e "\e[35m########################################################\e[0m\n"
 #
 ############################################################################################################
 
-echo -e "\e[96mPREREQ - 10. AUTO RESTART \e[0m \e[1mCheck If Auto Restart Is enabled ?\e[21m "
+echo -e "\e[96mPREREQ - 9. AUTO RESTART \e[0m \e[1mCheck If Auto Restart Is enabled ?\e[21m "
 autorestart=$(curl -s -u $LOGIN:$PASSWORD --insecure $PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/components?fields=ServiceComponentInfo/service_name,ServiceComponentInfo/recovery_enabled | grep -w '"recovery_enabled" : "true"' -B1  -A1 | grep -w '"component_name"' | awk -F ':' '{print $2}' | awk -F '"' '{print $2}' | tr -s '\n ' ',') 
 autorestart=${autorestart%,}
 
 if [ -z "$autorestart" ];then
-echo -e "\e[1mAuto Restart is disabled for all the components in $cluster_name\e[21m\n"
+	echo -e "\e[1mAuto Restart is disabled for all the components in $cluster_name\e[21m\n"
 else
-echo -e "\e[31mPlease Disable Auto Restart for Following Components :  \e[0m \n \e[1m$autorestart\e[21m\n"
-echo -e "Please Disable Auto Restart for Following Components : \n$autorestart " >> $REVIEW/servicecheck/DisableAutoRestart-$today.out
-echo -e "\e[1mOutput is available in the file: $REVIEW/servicecheck/DisableAutoRestart-$today.out \e[21m"
+	echo -e "\e[31mPlease Disable Auto Restart for Following Components :  \e[0m \n \e[1m$autorestart\e[21m\n"
+	echo -e "Please Disable Auto Restart for Following Components : \n$autorestart " >> $REVIEW/servicecheck/DisableAutoRestart-$today.out
+	echo -e "\e[1mOutput is available in the file: $REVIEW/servicecheck/DisableAutoRestart-$today.out \e[21m"
 fi
 echo -e "\e[35m########################################################\e[0m\n"
 
 
 ############################################################################################################
 #
-# 					DATABASE COMPATIBLITY CHECK
+# 				****	DATABASE COMPATIBLITY CHECK ** Do not change the sequence
 #
 ############################################################################################################
 
-echo -e "\e[96mPREREQ - 11. DATABASE COMPATIBLITY CHECK \e[0m \e[1mChecking if database versions are supported ?\e[21m "
+echo -e "\e[96mPREREQ - 10. DATABASE COMPATIBLITY CHECK \e[0m \e[1mChecking if database versions are supported ?\e[21m "
 echo -e "\e[1m Initiating Database Version Checks for required components\e[21m "
 
-if [ -f $INTR/files/DB-versioncheck-$today.out ]; then
-sh -x  $SCRIPTDIR/dbcompatible.sh $INTR/files/DB-versioncheck-$today.out $today $REVIEW/servicecheck &> $LOGDIR/DatabaseCompatibiltiyCheck-$today.log
-echo -e "\e[1mOutput is available in the file: $REVIEW/servicecheck/DatabaseCompatibiltiyCheck-$today.out \e[21m"
-echo -e "\e[1mPlease check the logs in the file : $LOGDIR/DatabaseCompatibiltiyCheck-$today.log  \e[21m"
+if [[ -f $INTR/files/DB-versioncheck-$today.out && -f $RESOURCE/dbcomp-cdpdc$CDPDC.properties ]]; then
+	sh -x $SCRIPTDIR/dbcompatible.sh $INTR/files/DB-versioncheck-$today.out $today $REVIEW/servicecheck $CDPDC $RESOURCE &> $LOGDIR/DatabaseCompatibiltiyCheck-$today.log
+	echo -e "\e[1mOutput is available in the file: $REVIEW/servicecheck/DatabaseCompatibiltiyCheck-$today.out \e[21m"
+	echo -e "\e[1mPlease check the logs in the file : $LOGDIR/DatabaseCompatibiltiyCheck-$today.log  \e[21m"
 else 
- echo -e "\e[31mDatabase version file $INTR/files/DB-versioncheck-$today.out does not exist ! \e[0m"
- echo -e "\e[31mPlease analyse the logs: $LOGDIR/rangerdatabasebkp-$today.log $LOGDIR/ranger_kms_databasebkp-$today.log $LOGDIR/hivetablescan-$today.log to find the problem ! \e[0m"
+ 	echo -e "\e[31mDatabase version file $INTR/files/DB-versioncheck-$today.out or $RESOURCE/dbcomp-cdpdc$CDPDC.properties does not exist ! \e[0m"
+ 	echo -e "\e[31mPlease analyse the logs: $LOGDIR/rangerdatabasebkp-$today.log $LOGDIR/ranger_kms_databasebkp-$today.log $LOGDIR/hivetablescan-$today.log or confirm if this script supports CDP-DC-$CDPDC to find the problem ! \e[0m"
 fi
 echo -e "\e[35m########################################################\e[0m\n"
 
@@ -761,10 +1029,10 @@ echo -e "\e[35m########################################################\e[0m\n"
 #
 ############################################################################################################
 
-echo -e "\e[96mPREREQ - 12. AMBARI VIEW \e[0m \e[1mChecking for Instances of Ambari Views which are removed as part of upgrade ?\e[21m "
+echo -e "\e[96mPREREQ - 11. AMBARI VIEW \e[0m \e[1mChecking for Instances of Ambari Views which are removed as part of upgrade ?\e[21m "
 echo -e "\e[1m Initiating Ambari View Checks for required components\e[21m "
 
-sh -x  $SCRIPTDIR/ambariview.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $PROTOCOL $INTR $today $REVIEW  &> $LOGDIR/AmbariView-$today.log &
+sh -x $SCRIPTDIR/ambariview.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $PROTOCOL $INTR $today $REVIEW  &> $LOGDIR/AmbariView-$today.log &
 echo -e "\e[1mOutput is available in the file: $REVIEW/servicecheck/ambariview-$today.out \e[21m"
 echo -e "\e[1mPlease check the logs in the file : $LOGDIR/AmbariView-$today.log  \e[21m"
 echo -e "\e[35m########################################################\e[0m\n"
@@ -776,9 +1044,9 @@ echo -e "\e[35m########################################################\e[0m\n"
 #
 ############################################################################################################
 if [ -z "$iskerberos" ];then
-echo -e "\e[32mKerberos is not enabled on $cluster_name. Skipping\e[0m \e[96mPREREQ - 13. KERBEROS CHECK \e[0m"
+	echo -e "\e[32mKerberos is not enabled on $cluster_name. Skipping\e[0m \e[96mPREREQ - 13. KERBEROS CHECK \e[0m"
 else
-	echo -e "\e[96mPREREQ - 13. KERBEROS CHECK \e[0m \e[1mChecking If Keytab & Krb5.conf is managed by Ambari? \e[21m "
+	echo -e "\e[96mPREREQ - 12. KERBEROS CHECK \e[0m \e[1mChecking If Keytab & Krb5.conf is managed by Ambari? \e[21m "
 	echo -e "\e[1m Initiating Kerberos check for managed keytabs and krb5.conf \e[21m "
 
 
@@ -827,10 +1095,96 @@ ismanagedkrb5=$(curl -s -u $LOGIN:$PASSWORD --insecure "$latestconfig" | grep ma
 		
 		echo -e "\e[31m Kerberos Krb5.conf is NOT Managed By Ambari\e[21m"  >> $REVIEW/servicecheck/KerberoCheck-$today.out
 		echo -e "\e[31m It is recommended to manage Kerberos krb5.conf using Ambari before upgrade.\n\e[21m \e[1mPlease consult Cloudera team for advice\e[0m"  >> $REVIEW/servicecheck/KerberoCheck-$today.out
-
 	fi
 
 echo -e "\e[1mOutput is available in the file: $REVIEW/servicecheck/KerberoCheck-$today.out \e[21m"
+
+fi
+
+echo -e "\e[35m########################################################\e[0m\n"
+############################################################################################################
+#
+# 					 Operating System Compatibility  CHECK
+#
+# 1. Check OS compatibility on all Nodes : ONLY MAJOR VERSION (limitation because of Ambari API)
+# 2. If want to check minor version need to configure a different script
+############################################################################################################
+
+
+echo -e "\n\e[96mPREREQ - 13. OS & Service Check \e[0m  \e[1mChecking OS compatibility and running service check\e[21m"
+
+sh -x $SCRIPTDIR/oscheck.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $REVIEW/os $today $INTR/files/ $PROTOCOL &> $LOGDIR/oscheck-$today.log  &
+
+echo -e "\e[1mOutput is available in the file: $REVIEW/os/oscheck-$today.out \e[21m"
+echo -e "Please check the logs in the file: \e[1m$LOGDIR/oscheck-$today.log\e[21m\n"
+echo -e "\e[35m########################################################\e[0m\n"
+
+
+############################################################################################################
+#
+# 					 Maintenancemode
+#
+# 
+# 
+############################################################################################################
+
+echo -e "\e[96mPREREQ - 15. Maintenance Mode \e[0m"
+mmode=`egrep -i "SMARTSENSE|LOGSEARCH|AMBARI_METRICS" $INTR/files/services.txt | tr -s '\n ' ','`
+mmode=${mmode%,}
+
+echo -e "\e[1m Enable Maintenance Mode for $mmode\e[21m"
+echo -e "\e[1m Enable Maintenance Mode for $mmode\e[21m" >> $REVIEW/servicecheck/mmode-$today.out
+echo -e "\e[1mOutput is available in the file: $REVIEW/servicecheck/mmode-$today.out \e[21m"
+echo -e "\e[35m########################################################\e[0m\n"
+
+
+############################################################################################################
+#
+# 					 Ambari Metrics Pre-Upgrade Check
+#
+# 1. Need to run pre upgrade script. 
+# 2. Need to automate pre upgrade for AMS
+############################################################################################################
+
+if [ -z "$isams" ];then
+	echo -e "\e[32mAmbari Metrics Server is not installed on $cluster_name. Skipping\e[0m \e[96mPREREQ - 15. Ambari Metrics Server CHECK \e[0m"
+else
+	echo -e "\e[96mPREREQ - 15. Ambari Metrics Server CHECK \e[0m"
+	cat $RESOURCE/ams-cdpdc$CDPDC.properties > $REVIEW/servicecheck/amscheck-$today.out
+	cat $RESOURCE/ams-cdpdc$CDPDC.properties
+	echo -e "\e[1mOutput is available in the file: $REVIEW/servicecheck/amscheck-$today.out \e[21m"
+fi
+
+echo -e "\e[35m########################################################\e[0m\n"
+
+############################################################################################################
+#
+#                    Atlas Backup
+# 
+#
+############################################################################################################
+sleep 30
+
+if [ -z "$isatlas" ]
+then
+	echo -e "\n\e[32mAtlas Is Not Installed, Skipping Skipping\e[0m \e[96mPREREQ - 15. ATLAS BACKUP \e[0m"
+else
+	while true; do
+    read -p $'\n\e[96mDo You Wish to take backup of Atlas Hbase tables (ATLAS_ENTITY_AUDIT_EVENTS & atlas_titan) (y/n) ? :\e[0m' yn
+    case $yn in
+        [Yy]* )   echo -e "\e[96mPREREQ - 16. ATLAS BACKUP\e[0m \e[1mRunning Atlas Backup:\e[21m  \n 1. Hbase table backup \n 2. Shard backup \n"
+                  sh -x $SCRIPTDIR/atlasbkp.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $PROTOCOL $cluster_name $today $iskerberos &> $LOGDIR/atlasbkp-$today.log &
+				  echo -e "Please check the logs in file:\e[1m $LOGDIR/atlasbkp-$today.log   \e[21m"
+ 				  echo -e "Check the status of the applicationsID in file:\e[1m $LOGDIR/atlasbkp-$today.log \e[21m"
+				  echo -e "Backup of hbase tables is stored in HDFS directory /atlasbackup$today   \e[21m"
+				  break;;
+        [Nn]* )   echo -e "\e[1m Please take a backup of Atlas Hbase tables (ATLAS_ENTITY_AUDIT_EVENTS & atlas_titan) manually \e[21m";
+         break;;
+        * ) echo "Please answer yes or no.";;
+    esac
+    done
+    
+	sleep 10
 fi
 
 echo -e "\e[35m########################################################\e[0m\n"
@@ -838,19 +1192,21 @@ echo -e "\e[35m########################################################\e[0m\n"
 
 ############################################################################################################
 #
-# 					 OS & SSERVICE CHECK
+# 					 SERVICE CHECK
 #
-# 1. Check OS compatibility on all Nodes : ONLY MAJOR VERSION (limitation because of Ambari API)
-# 2. If want to check minor version need to configure a different script
-# 3. Will run service checks on all the services installed in cluster.
+# 1. Will run service checks on all the services installed in cluster.
 ############################################################################################################
 
-
-echo -e "\n\e[96mPREREQ - 14. OS & Service Check \e[0m  \e[1mChecking OS compatibility and running service check\e[21m"
-
-sh -x  $SCRIPTDIR/run_all_service_check.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $REVIEW/os $REVIEW/servicecheck $today $INTR/files/ $PROTOCOL &> $LOGDIR/os-servicecheck-$today.log  &
-
-echo -e "\e[1mOutput is available in the file: $REVIEW/os/oscheck-$today.out \e[21m"
+echo -e "\e[96mPREREQ - 17. Service Check \e[0m  \e[1mrunning service check\e[21m"
+while true; do
+    read -p $'\n\e[96mAre you sure you wish to run service check on all components (y/n) ? :\e[0m' yn
+    case $yn in
+        [Yy]* ) sh -x $SCRIPTDIR/run_all_service_check.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $REVIEW/os $today $INTR/files/ $PROTOCOL &> $LOGDIR/os-servicecheck-$today.log  &
+         break;;
+        [Nn]* )  exit ; break;;
+        * ) echo "Please answer yes or no.";;
+    esac
+done
 echo -e "Please check the logs in the file: \e[1m$LOGDIR/os-servicecheck-$today.log\e[21m\n"
 echo -e "\e[35m########################################################\e[0m\n"
 
