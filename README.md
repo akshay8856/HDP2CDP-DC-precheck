@@ -44,8 +44,8 @@ To ease the launch of this script :
 
 1. Make sure below packages are installed :
 
-Packages: wget postgresql mysql/mariadb mysql-connector-java postgresql-jdbc perl python
-Clients : hdfs yarn mapreduce2 tez hbase hive
+* Packages: wget postgresql mysql/mariadb mysql-connector-java postgresql-jdbc perl python
+* Clients : hdfs yarn mapreduce2 tez hbase hive
 
 2. Configure access to Ambari, Ranger, RangerKMS, HiveMetastore and Oozie database from the node on which script is to be executed:
 
