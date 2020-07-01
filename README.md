@@ -83,10 +83,7 @@ psql -h node3.example.com -u rangerdba ranger
 Enter Password for rangerdba: 
 ```
 
-3. Configure passwordless SSH access :
-   edge node and Ambari host to take backup of ambari.properties and ambari-env. 
-   egde node and Infra Solr Instances to take backup of shards 
-
+3. Configure passwordless SSH access between edge node to Ambari, Zeppelin Master & Database server(Ambari, Ranger, RangerKMS, HiveMetastore and Oozie)
 *Note: If passwordless SSH cannot be configured you will have to perform few checks manually.
 
 4. Hive Client Must be Installed on the node where this script is executed.

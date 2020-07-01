@@ -20,7 +20,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 echo -e "\e[96mPlease confirm if you have met following prerequisites :\e[0m\n"
 echo -e "0. You should have root access on this node"
 echo -e "1. hdfs yarn mapreduce2 tez hive clients are Installed on this node"
-echo -e "2. Configure passwordless SSH access between edge node to Ambari & Zeppelin Master. \nIf passwordless SSH cannot be configured you will have to perform few checks manually.."
+echo -e "2. Configure passwordless SSH access between edge node to Ambari, Zeppelin Master & Database server(Ambari, Ranger, RangerKMS, HiveMetastore and Oozie). \nIf passwordless SSH cannot be configured you will have to perform few checks manually.."
 echo -e "3. Need Ambari details : Username, Password, Host, Port"
 echo -e "4. Need Ranger, RangerKMS, HiveMetastore and Oozie database password"
 echo -e "5. Configure access to Ambari, Ranger, RangerKMS, HiveMetastore and Oozie database from this node"
@@ -606,7 +606,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 
 if [ -z "$PWDSSH" ];then
    while true; do
-    read -p $'\e[96mPlease confirm if password less SSH is configured between Ambari, Ranger, RangerKMS, Oozie, Druid database and this node:(y/n) ? :\e[0m' yn
+    read -p $'\e[96mPlease confirm if password less SSH is configured between Ambari, Ranger, RangerKMS, Oozie database and this node:(y/n) ? :\e[0m' yn
     case $yn in
         [Yy]* )  export PWDSSH=y ; break;;
         [Nn]* )  export PWDSSH=n ; break;;
