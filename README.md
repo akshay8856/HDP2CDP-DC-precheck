@@ -52,7 +52,7 @@ The intent is to save the time required to prepare and perform upgrade.
 3. Hive Tables Snapshot
 4. Compaction of Hive Tables
 5. Config Group for multiple HS2 servers
-
+6. Support For Ubuntu and Oracle DB
 
 ### Environment Settings
 
