@@ -41,16 +41,17 @@ The intent is to save the time required to prepare and perform upgrade.
 
 * Atlas PreUpgrade Check
 
+* Preparing Zeppelin before preupgrade 
+
 * Service Check
 
 ### To Add 
 
 1. Hbase PreUpgrade Check 
 2. Kadmin principal Hostname Check
-3. Zeppelin Preupgrade Check
-4. Hive Tables Snapshot
-5. Compaction of Hive Tables
-6. Config Group for multiple HS2 servers
+3. Hive Tables Snapshot
+4. Compaction of Hive Tables
+5. Config Group for multiple HS2 servers
 
 
 ### Environment Settings

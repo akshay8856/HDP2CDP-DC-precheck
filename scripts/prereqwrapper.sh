@@ -289,6 +289,7 @@ isoozie=`grep -w "OOZIE" $INTR/files/services.txt`
 isatlas=`grep -w "ATLAS" $INTR/files/services.txt`
 isams=`grep -w "AMBARI_METRICS" $INTR/files/services.txt`
 iskafka=`grep -w "KAFKA" $INTR/files/services.txt`
+iszeppelin=`grep -w "ZEPPELIN" $INTR/files/services.txt`
 
 
 if [ -z "$isatlas" ]
@@ -332,6 +333,29 @@ else
    done
    fi
 fi
+
+
+
+if [ -z "$iszeppelin" ]
+then
+   :
+else
+	zeppelin_user=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=ZEPPELIN" |  grep -w '"zeppelin_user"' | tail -1 | awk -F ' : ' '{print $2}' | awk -F '"' '{print $2}')
+	zeppelin_princ=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=ZEPPELIN" |  grep -w '"zeppelin.server.kerberos.principal"' | tail -1 | awk -F ' : ' '{print $2}' | awk -F '"' '{print $2}')
+	zeppelin_keytab=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=ZEPPELIN" |  grep -w '"zeppelin.server.kerberos.keytab"' | tail -1 | awk -F ' : ' '{print $2}' | awk -F '"' '{print $2}')
+	zeppelin_conf=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=ZEPPELIN" |  grep -w '"zeppelin.config.fs.dir"' | tail -1 | awk -F ' : ' '{print $2}' | awk -F '"' '{print $2}')
+	zeppelin_storage=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=ZEPPELIN" |  grep -w '"zeppelin.notebook.storage"' | tail -1 | awk -F ' : ' '{print $2}' | awk -F '"' '{print $2}')
+	zeppelin_notebook=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=ZEPPELIN" |  grep -w '"zeppelin.notebook.dir"' | tail -1 | awk -F ' : ' '{print $2}' | awk -F '"' '{print $2}')
+	zeppelin_host=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/services/ZEPPELIN/components/ZEPPELIN_MASTER" | grep -w '"host_name"' | awk -F ' : ' '{print $2}' | awk -F '"' '{print $2}')
+	echo -e "zeppelin_user=$zeppelin_user" >> $FILES/clusterconfig.properties
+	echo -e "zeppelin_host=$zeppelin_host" >> $FILES/clusterconfig.properties
+	echo -e "zeppelin_notebook=$zeppelin_notebook" >> $FILES/clusterconfig.properties
+	echo -e "zeppelin_storage=$zeppelin_storage" >> $FILES/clusterconfig.properties
+	echo -e "zeppelin_conf=$zeppelin_conf" >> $FILES/clusterconfig.properties
+	echo -e "zeppelin_keytab=$zeppelin_keytab" >> $FILES/clusterconfig.properties
+	echo -e "zeppelin_princ=$zeppelin_princ" >> $FILES/clusterconfig.properties	
+fi
+
 
 
 
@@ -986,7 +1010,7 @@ if [  -z "$israngerkms" ]
 then
   echo ""
 else
-echo -e "\e[1mWaiting for Ranger_KMS to be started\e[0m"
+echo -e "\e[1mChecking Status for Ranger_KMS Service\e[0m"
 kms_start=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/services/RANGER_KMS?fields=ServiceInfo/state" | grep -v href | grep -w state |  awk -F ' : ' '{print $2}' | awk -F '"' '{print $2}')
 while [ "$kms_start" != "STARTED" ]; do
 kms_start=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/services/RANGER_KMS?fields=ServiceInfo/state" | grep -v href | grep -w state |  awk -F ' : ' '{print $2}' | awk -F '"' '{print $2}')
@@ -997,7 +1021,7 @@ done
 fi 
 
 sleep 20
-echo -e "\e[1mRanger_KMS started successfully\e[0m"
+echo -e "\e[1mRanger_KMS is Running\e[0m"
 
 
 if [ -z "$ishive" ]
@@ -1312,6 +1336,56 @@ fi
 
 echo -e "\e[35m########################################################\e[0m\n"
 
+############################################################################################################
+#
+# 					ZEPPELIN PREUPGRADE CHECK
+#
+# 1. all notebooks from HDFS to local FS
+# 2 Copy the interpreter.json and notebook-authorization.json
+############################################################################################################
+if [ -z "$iszeppelin" ]
+then
+	echo -e "\n\e[32mZeppelin Is Not Installed, Skipping\e[0m \e[96mPREREQ - 18. ZEPPELIN PREUPGRADE STEPS \e[0m"
+else
+ 	if  [ "$PWDSSH" == "y" ];then
+  			while true; do
+    			read -p $'\n\e[96m Initiating Backup of Notebook and Conf Directory from HDFS to local filesystem on $zeppelin_host. Please confirm if we should proceed (y/n) ? :\e[0m' yn
+    			case $yn in
+    				[Yy]* ) echo -e "\e[96mPREREQ - 18. ZEPPELIN PREUPGRADE STEPS \e[0m"
+  
+							sh -x $SCRIPTDIR/zeppelinbkp.sh $FILES/clusterconfig.properties $iskerberos &> $LOGDIR/zeppelin-preupgrade-$today.log &
+							echo -e "\e[1mBackup of all notebooks is available on $zeppelin_host in /var/lib/zeppelin/$zeppelin_notebook \e[21m"
+							echo -e "Backup of all notebooks is available on $zeppelin_host in /var/lib/zeppelin/$zeppelin_notebook" >> $REVIEW/servicecheck/zeppelin-preupgrade-$today.out
+							echo -e "\e[1mBackup of interpreter.json and notebook-authorization.json is available on $zeppelin_host in /var/lib/zeppelin/$zeppelin_conf \e[21m"
+							echo -e "Backup of interpreter.json and notebook-authorization.json is available on $zeppelin_host in /var/lib/zeppelin/$zeppelin_conf" >> $REVIEW/servicecheck/zeppelin-preupgrade-$today.out
+							echo -e "Please check the logs in the file: \e[1m$LOGDIR/zeppelin-preupgrade-$today.log\e[21m \n"	
+							break;;
+ 		
+ 					[Nn]* ) echo -e "\e[96mPREREQ - 18. ZEPPELIN PREUPGRADE STEPS \e[0m"
+ 							echo -e "\e[1mPlease take a backup Zeppelin Notebook and Conf dir from HDFS to local filesystem on $zeppelin_host \e[21m"
+ 							echo -e "Please take a backup Zeppelin Notebook and Conf dir from HDFS to local filesystem on $zeppelin_host" >> $REVIEW/servicecheck/zeppelin-preupgrade-$today.out
+        					echo -e "\e[1mPlease refer http://tiny.cloudera.com/zeppelinprecheck for detail steps"
+        					echo -e "Please refer http://tiny.cloudera.com/zeppelinprecheck for detail steps"  >> $REVIEW/servicecheck/zeppelin-preupgrade-$today.out
+
+        					echo -e "Output is available in file: \e[1m$REVIEW/servicecheck/zeppelin-preupgrade-$today.out\e[21m"
+        					break;;
+       	 			* ) echo "Please answer yes or no.";;
+       			esac
+  	 		done
+		else
+			echo -e "\e[96mPREREQ - 18. ZEPPELIN PREUPGRADE STEPS \e[0m"
+ 			echo -e "\e[1mPlease take a backup Zeppelin Notebook and Conf dir from HDFS to local filesystem on $zeppelin_host \e[21m"
+ 			echo -e "Please take a backup Zeppelin Notebook and Conf dir from HDFS to local filesystem on $zeppelin_host" >> $REVIEW/servicecheck/zeppelin-preupgrade-$today.out
+        	echo -e "\e[1mPlease refer http://tiny.cloudera.com/zeppelinprecheck for detail steps"
+        	echo -e "Please refer http://tiny.cloudera.com/zeppelinprecheck for detail steps"  >> $REVIEW/servicecheck/zeppelin-preupgrade-$today.out
+
+        	echo -e "Output is available in file: \e[1m$REVIEW/servicecheck/zeppelin-preupgrade-$today.out\e[21m"
+		fi	  
+
+fi 
+
+echo -e "\e[35m########################################################\e[0m\n"
+
 
 ############################################################################################################
 #
@@ -1320,7 +1394,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 # 1. Will run service checks on all the services installed in cluster.
 ############################################################################################################
 
-echo -e "\e[96mPREREQ - 18. Service Check \e[0m  \e[1mrunning service check\e[21m"
+echo -e "\e[96mPREREQ - 19. Service Check \e[0m  \e[1mrunning service check\e[21m"
 while true; do
     read -p $'\n\e[96mAre you sure you wish to run service check on all components (y/n) ? :\e[0m' yn
     case $yn in
