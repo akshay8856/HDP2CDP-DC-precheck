@@ -9,9 +9,11 @@ The intent is to save the time required to prepare and perform upgrade.
 
 * Ambari Database, ambari.properties and ambari-env backup
 
+* RangerKMS Database Backup
+
 * Ranger Database Backup
 
-* RangerKMS Database Backup
+* Oozie Database Backup
 
 * Deprecated Components
 
@@ -19,9 +21,9 @@ The intent is to save the time required to prepare and perform upgrade.
 
 * Third Party Services
 
-* [Hive Pre Upgrade](https://github.com/dstreev/cloudera_upgrade_utils/blob/master/hive-sre/README.md)
+* Kafka PreUpgrade Check
 
-* Atlas backup (hbase tables)
+* [Hive Pre Upgrade](https://github.com/dstreev/cloudera_upgrade_utils/blob/master/hive-sre/README.md)
 
 * Ambari Auto Restart Enabled
 
@@ -31,11 +33,24 @@ The intent is to save the time required to prepare and perform upgrade.
 
 * Ambari Managed Keytabs and krb5.conf
 
-* OS Compatibility & Service Check
+* OS Compatibility 
+
+* Maintenance Mode
+
+* Ambari Metrics Server check (WIP)
+
+* Atlas PreUpgrade Check
+
+* Service Check
 
 ### To Add 
 
-1. Atlas backup (solr collections)
+1. Hbase PreUpgrade Check 
+2. Kadmin principal Hostname Check
+3. Zeppelin Preupgrade Check
+4. Hive Tables Snapshot
+5. Compaction of Hive Tables
+6. Config Group for multiple HS2 servers
 
 
 ### Environment Settings
@@ -44,8 +59,8 @@ To ease the launch of this script :
 
 1. Make sure below packages are installed :
 
-* Packages: wget postgresql mysql/mariadb mysql-connector-java postgresql-jdbc perl python
-* Clients : hdfs yarn mapreduce2 tez hbase hive
+Packages: wget postgresql mysql/mariadb mysql-connector-java postgresql-jdbc perl python
+Clients : hdfs yarn mapreduce2 tez hbase hive
 
 2. Configure access to Ambari, Ranger, RangerKMS, HiveMetastore and Oozie database from the node on which script is to be executed:
 
@@ -128,9 +143,10 @@ OPTIONAL:
 -RP | --ranger_pwd  	: Ranger Database Password
 -RKP| --ranger_kms_pwd	: Ranger KMS Database Password
 -OP | --oozie_pwd		: Ooize Database Password
+-AP | --atlas_pwd		: Altas Admin Password 
 
 For example :
-# sh /HDP2CDP-DC-precheck/scripts/prereqwrapper.sh  --cdpdc_version=7.1.1 --ambari=c3110-node1 --port=8080 --user=admin --password=amankumbare --ssl=no --hms=hadoop  --ranger_pwd=rangerdba --ranger_kms_pwd=rangerkms --oozie_pwd=akshayoozie
+# sh /HDP2CDP-DC-precheck/scripts/prereqwrapper.sh  --cdpdc_version=7.1.1 --ambari=c3110-node1 --port=8080 --user=admin --password=amankumbare --ssl=no --hms=hadoop  --ranger_pwd=rangerdba --ranger_kms_pwd=rangerkms --oozie_pwd=akshayoozie --atlas_pwd=admin
 
 ```
 
