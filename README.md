@@ -87,9 +87,9 @@ Enter Password for rangerdba:
    edge node and Ambari host to take backup of ambari.properties and ambari-env. 
    egde node and Infra Solr Instances to take backup of shards 
 
-*Note: If passwordless SSH cannot be configured you need to take backup of ambari.properties, ambari-env and Atlas related shards in Ambari infra manually*
+*Note: If passwordless SSH cannot be configured you will have to perform few checks manually.
 
-4. Hive Client Must be Installed on the node where this script is executed. Hbase client should be installed if Atlas is installed in the cluster.
+4. Hive Client Must be Installed on the node where this script is executed.
 
 5. For unsecured cluster : (This is required for Hive Pre Upgrade check & Atlas hbase table backup)
 ```
