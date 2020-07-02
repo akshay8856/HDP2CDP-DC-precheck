@@ -20,7 +20,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 echo -e "\e[96mPlease confirm if you have met following prerequisites :\e[0m\n"
 echo -e "0. You should have root access on this node"
 echo -e "1. hdfs yarn mapreduce2 tez hive clients are Installed on this node"
-echo -e "2. Configure passwordless SSH access between edge node to Ambari, Zeppelin Master & Database server(Ambari, Ranger, RangerKMS, HiveMetastore and Oozie). \nIf passwordless SSH cannot be configured you will have to perform few checks manually.."
+echo -e "2. Configure passwordless SSH access between edge node to Ambari, Zeppelin Master, KDC/Kadmin server & Database server(Ambari, Ranger, RangerKMS, HiveMetastore and Oozie). \nIf passwordless SSH cannot be configured you will have to perform few checks manually.."
 echo -e "3. Need Ambari details : Username, Password, Host, Port"
 echo -e "4. Need Ranger, RangerKMS, HiveMetastore and Oozie database password"
 echo -e "5. Configure access to Ambari, Ranger, RangerKMS, HiveMetastore and Oozie database from this node"
@@ -292,15 +292,15 @@ iskafka=`grep -w "KAFKA" $INTR/files/services.txt`
 iszeppelin=`grep -w "ZEPPELIN" $INTR/files/services.txt`
 
 
-if [ -z "$isatlas" ]
-	then
-  	 :
-else
-	if ! [ -x "$(command -v hbase)" ]; then
- 	 echo -e "\e[31mError: hbase client is not installed.\e[0m"
-  	 exit 1
-	fi
-fi
+#if [ -z "$isatlas" ]
+#	then
+#  	 :
+#else
+#	if ! [ -x "$(command -v hbase)" ]; then
+# 	 echo -e "\e[31mError: hbase client is not installed.\e[0m"
+#  	 exit 1
+#	fi
+#fi
 
 
 if [ -z "$iskerberos" ]
@@ -802,7 +802,7 @@ else
 fi
 ####exiting [ -z "$isranger" ] BKP
 
-sleep 20
+sleep 10
 
 echo -e "\e[35m########################################################\e[0m\n"
 
@@ -1018,10 +1018,10 @@ kms_start=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PO
 #	echo $kms_start
 #	echo -e "Wating for Ranger_KMS to start"
 done
+echo -e "\e[1mRanger_KMS is Running\e[0m"
 fi 
 
 sleep 20
-echo -e "\e[1mRanger_KMS is Running\e[0m"
 
 
 if [ -z "$ishive" ]
@@ -1045,7 +1045,7 @@ else
 
  					[Nn]* ) echo -e "\e[96mPREREQ - 9. HIVE CHECK\e[0m \e[1m Hive Database Backup\e[21m"
  							sh -x $SCRIPTDIR/hivedatabaseversion.sh $today $INTR $FILES/clusterconfig.properties $hms_dbpwd &> $LOGDIR/hivedb-version-$today.log & 
- 							echo -e "\e[1mPlease take a backup of Hive Database manually on $hms_dbhost \n- For mysql : mysqldump -u $hmsdb_user -p$hms_dbpwd $hive_database_name > hivedb.sql \n- For Psql: PGPASSWORD=$hms_dbpwd  pg_dump -p 5432 -U $ranger_dbuser  $hive_database_name > hivedb.sql  \e[21m"
+ 							echo -e "\e[1mPlease take a backup of Hive Database manually on $hms_dbhost \n- For mysql : mysqldump -u $hmsdb_user -p$hms_dbpwd $hive_database_name > hivedb.sql \n- For Psql: PGPASSWORD=$hms_dbpwd  pg_dump -p 5432 -U $hmsdb_user  $hive_database_name > hivedb.sql  \e[21m"
              			    echo -e "\e[1mPlease take a backup of Hive Database manually on $hms_dbhost \n- For mysql : mysqldump -u $hmsdb_user -p$hms_dbpwd $hive_database_name > hivedb.sql \n- For Psql: PGPASSWORD=$hms_dbpwd  pg_dump -p 5432 -U $hmsdb_user  $hive_database_name > hivedb.sql  \e[21m" >> $BKP/database_bkp-$today.out      
         					echo -e "Please check the logs in the file: \e[1m$LOGDIR/hivedb-version-$today.log \e[21m  \n"	
         					echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"
@@ -1057,7 +1057,7 @@ else
 
 				echo -e "\e[96mPREREQ - 9. HIVE CHECK\e[0m \e[1m Hive Database Backup\e[21m"
  				sh -x $SCRIPTDIR/hivedatabaseversion.sh $today $INTR $FILES/clusterconfig.properties $hms_dbpwd &> $LOGDIR/hivedb-version-$today.log & 
- 				echo -e "\e[1mPlease take a backup of Hive Database manually on $hms_dbhost \n- For mysql : mysqldump -u $hmsdb_user -p$hms_dbpwd $hive_database_name > hivedb.sql \n- For Psql: PGPASSWORD=$hms_dbpwd  pg_dump -p 5432 -U $ranger_dbuser  $hive_database_name > hivedb.sql  \e[21m"
+ 				echo -e "\e[1mPlease take a backup of Hive Database manually on $hms_dbhost \n- For mysql : mysqldump -u $hmsdb_user -p$hms_dbpwd $hive_database_name > hivedb.sql \n- For Psql: PGPASSWORD=$hms_dbpwd  pg_dump -p 5432 -U $hmsdb_user  $hive_database_name > hivedb.sql  \e[21m"
                 echo -e "\e[1mPlease take a backup of Hive Database manually on $hms_dbhost \n- For mysql : mysqldump -u $hmsdb_user -p$hms_dbpwd $hive_database_name > hivedb.sql \n- For Psql: PGPASSWORD=$hms_dbpwd  pg_dump -p 5432 -U $hmsdb_user  $hive_database_name > hivedb.sql  \e[21m" >> $BKP/database_bkp-$today.out 
                 echo -e "Please check the logs in the file: \e[1m$LOGDIR/hivedb-version-$today.log \e[21m  \n"	     
         		echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"
@@ -1138,6 +1138,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 # 					CHECK IF KEYTABS & KRB5.CONF ARE NOT MANAGED BY AMBARI
 #
 ############################################################################################################
+
 if [ -z "$iskerberos" ];then
 	echo -e "\e[32mKerberos is not enabled on $cluster_name. Skipping\e[0m \e[96mPREREQ - 13. KERBEROS CHECK \e[0m"
 else
@@ -1148,23 +1149,68 @@ else
 latestconfig=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=KERBEROS" | grep service_config_version= | awk -F ' : ' '{print $2}' |  awk -F '"' '{print $2}' | tail -1)
 ismanagedkeytab=$(curl -s -u $LOGIN:$PASSWORD --insecure "$latestconfig" | grep manage_identities | awk -F ':' '{print $2}' | awk -F '"' '{print $2}')
 ismanagedkrb5=$(curl -s -u $LOGIN:$PASSWORD --insecure "$latestconfig" | grep manage_krb5_conf | awk -F ':' '{print $2}' | awk -F '"' '{print $2}')
-
-# This Step is to make sure scripts does not fail because of host key verification
-# Will backup the current known_hosts file in /$user-homedir/.ssh/known_hosts.old
-# Remove the host key for the specified host from /$useri-home-dir/.ssh/known_hosts.old
-#ssh-keygen -R $AMBARI_HOST
-
-# Will get the latest host key from the specified hosts
-#ssh-keyscan $AMBARI_HOST  >> ~/.ssh/known_hosts 
-#sleep 2
+kdc_type=$(curl -s -u $LOGIN:$PASSWORD --insecure "$latestconfig" | grep kdc_type | awk -F ':' '{print $2}' | awk -F '"' '{print $2}')
 
 
-#ismanagedkrb5=`ssh $AMBARI_HOST /var/lib/ambari-server/resources/scripts/configs.py --port=$PORT --action=get --host=$AMBARI_HOST --cluster=$cluster_name --config-type=krb5-conf --user=$LOGIN --password=$PASSWORD | grep manage_krb5_conf | awk -F ':' '{print $2}' | awk -F '"' '{print $2}'`
-#ismanagedkeytab=`ssh $AMBARI_HOST /var/lib/ambari-server/resources/scripts/configs.py --port=$PORT --action=get --host=$AMBARI_HOST --cluster=$cluster_name --config-type=kerberos-env --user=$LOGIN --password=$PASSWORD | grep manage_identities | awk -F ':' '{print $2}' | awk -F '"' '{print $2}'`
 
 	if [[  "$ismanagedkeytab" == "true" &&  "$ismanagedkrb5" == "true" ]]; then
 		echo -e "\e[32m Kerberos Keytabs & Krb5 is Managed By Ambari \n\e[0m"
-		echo -e "\e[32m Kerberos Keytabs & Krb5 is Managed By Ambari \n\e[0m" >> $REVIEW/servicecheck/KerberoCheck-$today.out
+		echo -e "Kerberos Keytabs & Krb5 is Managed By Ambari \n" >> $REVIEW/servicecheck/KerberoCheck-$today.out
+
+		if  [[ "$PWDSSH" == "y" && "$kdc_type" == "mit-kdc" ]];then
+			kadmin_host=$(curl -s -u $LOGIN:$PASSWORD --insecure "$latestconfig" | grep -w '"admin_server_host"' | awk -F ':' '{print $2}' | awk -F '"' '{print $2}')
+  			
+  			# Getting Kadmin credentials 
+  			echo -en "\e[96mEnter kerberos admin principal: \e[0m"
+			read "kadminprincipal"
+			echo -en "\n\e[96mEnter Password for $kadminprincipal : \e[0m"
+			read -s "kadmin_pwd"
+			kadminprincipal=$kadminprincipal
+			kadmin_pwd=$kadmin_pwd
+
+			ssh-keygen -R $kadmin_host
+			# Will get the latest host key from the specified hosts
+			ssh-keyscan $kadmin_host  >> ~/.ssh/known_hosts
+
+			kadmin_fqdn=`ssh $kadmin_host "hostname -f"`
+			ssh $kadmin_host "export KRB5CCNAME=/tmp/kadmin_cc ; kinit $kadminprincipal <<<$kadmin_pwd "
+			kadmin_prin_ver=`ssh $kadmin_host "kadmin.local -q listprincs | grep 'kadmin/' | grep $kadmin_fqdn"`
+
+
+			if [[ "$kadmin_host" == "$kadmin_fqdn" ]]; then
+    			echo -e "\e[32mFQDN is configured for Kadmin Server\e[0m"
+    			echo -e "FQDN is configured for Kadmin Server" >> $REVIEW/servicecheck/KerberoCheck-$today.out
+    			
+			else
+    			echo -e "\e[31mFQDN is NOT condfiured for Kadmin Server\e[21m"
+    			echo -e "FQDN is NOT configured for Kadmin Server" >> $REVIEW/servicecheck/KerberoCheck-$today.out
+    			
+    		fi
+
+			if [ -z "$kadmin_prin_ver" ]
+			then
+      			echo -e "\e[31mThe format of kadmin service principal expected is kadmin/fully.qualified.kdc.hostname@REALM.\nThis increased security expects a Kerberos admin service principal to be present with a specifically formatted principal name.\e[0m"
+      			echo -e "\nThe format of kadmin service principal expected is kadmin/fully.qualified.kdc.hostname@REALM.\nThis increased security expects a Kerberos admin service principal to be present with a specifically formatted principal name." >> $REVIEW/servicecheck/KerberoCheck-$today.out
+			else
+  				echo -e "\e[32mThe format of kadmin service principal is correct $kadmin_prin_ver \e[0m"
+  				echo -e "\nThe format of kadmin service principal is correct $kadmin_prin_ver " >> $REVIEW/servicecheck/KerberoCheck-$today.out
+			fi
+
+			echo -e "\e[1mPlease refer : http://tiny.cloudera.com/kadmincheck for details\e[21m"
+    		echo -e "Please refer : http://tiny.cloudera.com/kadmincheck for details" >> $REVIEW/servicecheck/KerberoCheck-$today.out
+
+		else
+
+ 			echo -e "\e[1mPlease validate below checks manually as passwordless ssh is not configured OR KDC type is not MIT_KDC \e[21m"
+ 			echo -e "\e[1m1. FQDN is configured for Kadmin server\n2. Format of Kadmin Service Principal Name\e[21m"
+
+ 			echo -e "Please validate below checks manually as passwordless ssh is not configured OR KDC type is not MIT_KDC" >> $REVIEW/servicecheck/KerberoCheck-$today.out
+ 			echo -e "1. FQDN is configured for Kadmin server\n2. Format of Kadmin Service Principal Name" >> $REVIEW/servicecheck/KerberoCheck-$today.out
+
+ 			echo -e "\e[1mPlease refer : http://tiny.cloudera.com/kadmincheck for details\e[21m"
+    		echo -e "Please refer : http://tiny.cloudera.com/kadmincheck for details" >> $REVIEW/servicecheck/KerberoCheck-$today.out
+
+		fi
 
 
 	elif [[ "$ismanagedkeytab" != "true"  && "$ismanagedkrb5" != "true" ]]; then
@@ -1172,24 +1218,79 @@ ismanagedkrb5=$(curl -s -u $LOGIN:$PASSWORD --insecure "$latestconfig" | grep ma
 		echo -e "\e[31m Kerberos Keytabs & Krb5 are NOT Managed By Ambari\e[21m"
 		echo -e "\e[31m It is recommended to manage Kerberos Keytabs & Krb5 using Ambari before upgrade\n\e[21m \e[1mPlease consult Cloudera team for advice\e[0m"
 		
-		echo -e "\e[31m Kerberos Keytabs & Krb5 are NOT Managed By Ambari\e[21m" >> $REVIEW/servicecheck/KerberoCheck-$today.out
-		echo -e "\e[31m It is recommended to manage Kerberos Keytabs & Krb5 using Ambari before upgrade\n\e[21m \e[1mPlease consult Cloudera team for advice\e[0m" >> $REVIEW/servicecheck/KerberoCheck-$today.out
+		echo -e "Kerberos Keytabs & Krb5 are NOT Managed By Ambari" >> $REVIEW/servicecheck/KerberoCheck-$today.out
+		echo -e "It is recommended to manage Kerberos Keytabs & Krb5 using Ambari before upgrade\nPlease consult Cloudera team for advice" >> $REVIEW/servicecheck/KerberoCheck-$today.out
 
 	elif [[ "$ismanagedkeytab" != "true" &&  "$ismanagedkrb5" == "true" ]]; then
 
 		echo -e "\e[31m Kerberos Keytabs are NOT Managed By Ambari\e[21m"
 		echo -e "\e[31m It is recommended to manage Kerberos Keytabs using Ambari before upgrade.\n\e[21m \e[1mPlease consult Cloudera team for advice\e[0m"
 		
-		echo -e "\e[31m Kerberos Keytabs are NOT Managed By Ambari\e[21m" >> $REVIEW/servicecheck/KerberoCheck-$today.out
-		echo -e "\e[31m It is recommended to manage Kerberos Keytabs using Ambari before upgrade.\n\e[21m \e[1mPlease consult Cloudera team for advice\e[0m" >> $REVIEW/servicecheck/KerberoCheck-$today.out
+		echo -e "Kerberos Keytabs are NOT Managed By Ambari" >> $REVIEW/servicecheck/KerberoCheck-$today.out
+		echo -e "It is recommended to manage Kerberos Keytabs using Ambari before upgrade.\nPlease consult Cloudera team for advice" >> $REVIEW/servicecheck/KerberoCheck-$today.out
+
+		if  [[ "$PWDSSH" == "y" && "$kdc_type" == "mit-kdc" ]];then
+			kadmin_host=$(curl -s -u $LOGIN:$PASSWORD --insecure "$latestconfig" | grep -w '"admin_server_host"' | awk -F ':' '{print $2}' | awk -F '"' '{print $2}')
+  			
+  			# Getting Kadmin credentials 
+  			echo -en "\e[96mEnter kerberos admin principal: \e[0m"
+			read "kadminprincipal"
+			echo -en "\n\e[96mEnter Password for $kadminprincipal : \e[0m"
+			read -s "kadmin_pwd"
+			kadminprincipal=$kadminprincipal
+			kadmin_pwd=$kadmin_pwd
+
+			ssh-keygen -R $kadmin_host
+			# Will get the latest host key from the specified hosts
+			ssh-keyscan $kadmin_host  >> ~/.ssh/known_hosts
+
+			kadmin_fqdn=`ssh $kadmin_host "hostname -f"`
+			ssh $kadmin_host "export KRB5CCNAME=/tmp/kadmin_cc ; kinit $kadminprincipal <<<$kadmin_pwd "
+			kadmin_prin_ver=`ssh $kadmin_host "kadmin.local -q listprincs | grep 'kadmin/' | grep $kadmin_fqdn"`
+
+
+			if [[ "$kadmin_host" == "$kadmin_fqdn" ]]; then
+    			echo -e "\e[32mFQDN is configured for Kadmin Server\e[0m"
+    			echo -e "FQDN is configured for Kadmin Server" >> $REVIEW/servicecheck/KerberoCheck-$today.out
+    			
+			else
+    			echo -e "\e[31mFQDN is NOT condfiured for Kadmin Server\e[21m"
+    			echo -e "FQDN is NOT configured for Kadmin Server" >> $REVIEW/servicecheck/KerberoCheck-$today.out
+    			
+    		fi
+
+			if [ -z "$kadmin_prin_ver" ]
+			then
+      			echo -e "\e[31mThe format of kadmin service principal expected is kadmin/fully.qualified.kdc.hostname@REALM.\nThis increased security expects a Kerberos admin service principal to be present with a specifically formatted principal name.\e[0m"
+      			echo -e "\nThe format of kadmin service principal expected is kadmin/fully.qualified.kdc.hostname@REALM.\nThis increased security expects a Kerberos admin service principal to be present with a specifically formatted principal name." >> $REVIEW/servicecheck/KerberoCheck-$today.out
+			else
+  				echo -e "\e[32mThe format of kadmin service principal is correct $kadmin_prin_ver \e[32m"
+  				echo -e "\nThe format of kadmin service principal is correct $kadmin_prin_ver " >> $REVIEW/servicecheck/KerberoCheck-$today.out
+			fi
+
+			echo -e "\e[1mPlease refer : http://tiny.cloudera.com/kadmincheck for details\e[21m"
+    		echo -e "Please refer : http://tiny.cloudera.com/kadmincheck for details" >> $REVIEW/servicecheck/KerberoCheck-$today.out
+
+		else
+
+ 			echo -e "\e[1mPlease validate below checks manually as passwordless ssh is not configured OR KDC type is not MIT_KDC \e[21m"
+ 			echo -e "\e[1m1. FQDN is configured for Kadmin server\n2. Format of Kadmin Service Principal Name\e[21m"
+
+ 			echo -e "Please validate below checks manually as passwordless ssh is not configured OR KDC type is not MIT_KDC" >> $REVIEW/servicecheck/KerberoCheck-$today.out
+ 			echo -e "1. FQDN is configured for Kadmin server\n2. Format of Kadmin Service Principal Name" >> $REVIEW/servicecheck/KerberoCheck-$today.out
+
+ 			echo -e "\e[1mPlease refer : http://tiny.cloudera.com/kadmincheck for details\e[21m"
+    		echo -e "Please refer : http://tiny.cloudera.com/kadmincheck for details" >> $REVIEW/servicecheck/KerberoCheck-$today.out
+
+		fi
 
 	else
 
 		echo -e "\e[31m Kerberos Krb5.conf is NOT Managed By Ambari\e[21m"
 		echo -e "\e[31m It is recommended to manage Kerberos krb5.conf using Ambari before upgrade.\n\e[21m \e[1mPlease consult Cloudera team for advice\e[0m"
 		
-		echo -e "\e[31m Kerberos Krb5.conf is NOT Managed By Ambari\e[21m"  >> $REVIEW/servicecheck/KerberoCheck-$today.out
-		echo -e "\e[31m It is recommended to manage Kerberos krb5.conf using Ambari before upgrade.\n\e[21m \e[1mPlease consult Cloudera team for advice\e[0m"  >> $REVIEW/servicecheck/KerberoCheck-$today.out
+		echo -e "Kerberos Krb5.conf is NOT Managed By Ambari"  >> $REVIEW/servicecheck/KerberoCheck-$today.out
+		echo -e "It is recommended to manage Kerberos krb5.conf using Ambari before upgrade.\nPlease consult Cloudera team for advice"  >> $REVIEW/servicecheck/KerberoCheck-$today.out
 	fi
 
 echo -e "\e[1mOutput is available in the file: $REVIEW/servicecheck/KerberoCheck-$today.out \e[21m"
@@ -1228,7 +1329,9 @@ mmode=`egrep -i "SMARTSENSE|LOGSEARCH|AMBARI_METRICS" $INTR/files/services.txt |
 mmode=${mmode%,}
 
 echo -e "\e[1m Enable Maintenance Mode for $mmode\e[21m"
+echo -e "\e[1m Stop LOGSEARCH if installed\e[21m"
 echo -e "\e[1m Enable Maintenance Mode for $mmode\e[21m" >> $REVIEW/servicecheck/mmode-$today.out
+echo -e "\n\e[1m Stop LOGSEARCH if installed\e[21m" >> $REVIEW/servicecheck/mmode-$today.out
 echo -e "\e[1mOutput is available in the file: $REVIEW/servicecheck/mmode-$today.out \e[21m"
 echo -e "\e[35m########################################################\e[0m\n"
 
@@ -1246,7 +1349,12 @@ if [ -z "$isams" ];then
 else
 	echo -e "\e[96mPREREQ - 16. Ambari Metrics Server CHECK \e[0m"
 	cat $RESOURCE/ams-cdpdc$CDPDC.properties > $REVIEW/servicecheck/amscheck-$today.out
-	cat $RESOURCE/ams-cdpdc$CDPDC.properties
+	#cat $RESOURCE/ams-cdpdc$CDPDC.properties
+	echo -e "\e[1mBackup AMS before upgrading Ambari by following the steps (3) mentioned in below document:\e[21m"
+	echo -e "\e[1mhttp://tiny.cloudera.com/amsbkp\e[21m\n"
+    echo -e "\e[1mAfter Upgrading Ambari please follow below steps:\e[21m"
+    echo -e "\e[1m- Stop Ambari Metrics Service and SmartSense"
+    echo -e "\e[1m- Manually upgrade AMS and Smart Sense : http://tiny.cloudera.com/ams-ss-upgrade\e[21m"	
 	echo -e "\e[1mOutput is available in the file: $REVIEW/servicecheck/amscheck-$today.out \e[21m"
 fi
 

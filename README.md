@@ -1,4 +1,4 @@
-## HDP2.6 To CDP-DC Preupgrade Checks
+## HDP2.6 To CDP-DC Preupgrade Checks (WIP) 
 
 This tool is to help customers to prepare and plan for upgrade from HDP to CDP-DC. Helps to get details on what actions are required before upgrading the HDP 2.x clusters.
 
@@ -21,7 +21,7 @@ The intent is to save the time required to prepare and perform upgrade.
 
 * Third Party Services
 
-* Kafka PreUpgrade Check
+* Kafka PreUpgrade Check ( Ambari Manages Krb5/keytabs, Kadmin principal Hostname Check (MIT_KDC) , KDC Admin Host FQDN (MIT_KDC))
 
 * [Hive Pre Upgrade](https://github.com/dstreev/cloudera_upgrade_utils/blob/master/hive-sre/README.md)
 
@@ -48,11 +48,17 @@ The intent is to save the time required to prepare and perform upgrade.
 ### To Add 
 
 1. Hbase PreUpgrade Check 
-2. Kadmin principal Hostname Check
+2. Kadmin principal Hostname Check (for AD)/ KDC Admin Host FQDN (for AD) / KDC Admin Credentials ??
 3. Hive Tables Snapshot
 4. Compaction of Hive Tables
 5. Config Group for multiple HS2 servers
 6. Support For Ubuntu and Oracle DB
+7. Backup of Data Dir for Databases 
+8. Host Maintenance Mode
+9. Disk Space
+10. Service Maintenance Mode
+11. Backing up Ambari infra data and migrating Atlas data
+12. Checkpoint HDFS
 
 ### Environment Settings
 
@@ -83,7 +89,7 @@ psql -h node3.example.com -u rangerdba ranger
 Enter Password for rangerdba: 
 ```
 
-3. Configure passwordless SSH access between edge node to Ambari, Zeppelin Master & Database server(Ambari, Ranger, RangerKMS, HiveMetastore and Oozie)
+3. Configure passwordless SSH access between edge node to Ambari, Zeppelin Master, KDC/Kadmin server & Database server(Ambari, Ranger, RangerKMS, HiveMetastore and Oozie)
 *Note: If passwordless SSH cannot be configured you will have to perform few checks manually.
 
 4. Hive Client Must be Installed on the node where this script is executed.
