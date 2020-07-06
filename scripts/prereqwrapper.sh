@@ -244,27 +244,30 @@ fi
 # 				*******  CREATING DIRECTORY STRUCTURE *******
 # Do not change the order of the section marked with *******
 ############################################################################################################
-
-INTR=/HDP2CDP-DC-precheck
+#SCRIPTDIR=$INTR/scripts
+SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+#INTR=/upgrade
+INTR="$(dirname "$SCRIPTDIR")"
 HIVECFG=$INTR/hivechecks
-SCRIPTDIR=$INTR/scripts
+RESOURCE=$INTR/resources
+
 REVIEW=$INTR/review
 LOGDIR=$INTR/logs
 BKP=$INTR/backup
-RESOURCE=$INTR/resources
 FILES=$INTR/files
 
 today="$(date +"%Y%m%d%H%M")"
 USER=`whoami`
-mkdir -p $INTR/files
-mkdir -p $INTR/review/hive
-mkdir -p $INTR/review/os
-mkdir -p $INTR/review/servicecheck
-mkdir -p $INTR/scripts
-mkdir -p $INTR/hivechecks
-mkdir -p $INTR/logs
-mkdir -p $INTR/backup
-mkdir -p $INTR/resources
+mkdir -p $FILES
+mkdir -p $REVIEW/hive
+mkdir -p $REVIEW/os
+mkdir -p $REVIEW/servicecheck
+mkdir -p $LOGDIR
+mkdir -p $BKP
+
+mkdir -p $SCRIPTDIR
+mkdir -p $HIVECFG
+mkdir -p $RESOURCE
 
 
 ############################################################################################################
@@ -273,8 +276,8 @@ mkdir -p $INTR/resources
 #  Do not change the order of the section marked with *******
 ############################################################################################################
 
-echo -e "\n\e[1mCreating a list of services installed in cluster $cluster_name :$INTR/files/services.txt\e[21m"
-curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/services?fields=ServiceInfo/service_name" | python -mjson.tool | perl -ne '/"service_name":.*?"(.*?)"/ && print "$1\n"' > $INTR/files/services.txt
+echo -e "\n\e[1mCreating a list of services installed in cluster $cluster_name :$FILES/services.txt\e[21m"
+curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/services?fields=ServiceInfo/service_name" | python -mjson.tool | perl -ne '/"service_name":.*?"(.*?)"/ && print "$1\n"' > $FILES/services.txt
 hdfs_nameservice=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=HDFS" |  grep -w '"dfs.nameservices"' | tail -1 | awk -F ' : ' '{print $2}' | awk -F '"' '{print $2}')
 echo -e "hdfs_nameservice=$hdfs_nameservice" >> $FILES/clusterconfig.properties
 echo -e "\e[35m########################################################\e[0m\n"
@@ -283,15 +286,15 @@ echo -e "\e[35m########################################################\e[0m\n"
 #				 *******COLLECTING OTHER REQUIRED DETAILS WHICH CANNOT BE DERIVED FROM API's*******
 ## Do not change the order of the section marked with *******
 ############################################################################################################
-isranger=`grep -w "RANGER" $INTR/files/services.txt`
-israngerkms=`grep -w "RANGER_KMS" $INTR/files/services.txt`
-ishive=`grep -w "HIVE" $INTR/files/services.txt`
-iskerberos=`grep -w "KERBEROS" $INTR/files/services.txt`
-isoozie=`grep -w "OOZIE" $INTR/files/services.txt`
-isatlas=`grep -w "ATLAS" $INTR/files/services.txt`
-isams=`grep -w "AMBARI_METRICS" $INTR/files/services.txt`
-iskafka=`grep -w "KAFKA" $INTR/files/services.txt`
-iszeppelin=`grep -w "ZEPPELIN" $INTR/files/services.txt`
+isranger=`grep -w "RANGER" $FILES/services.txt`
+israngerkms=`grep -w "RANGER_KMS" $FILES/services.txt`
+ishive=`grep -w "HIVE" $FILES/services.txt`
+iskerberos=`grep -w "KERBEROS" $FILES/services.txt`
+isoozie=`grep -w "OOZIE" $FILES/services.txt`
+isatlas=`grep -w "ATLAS" $FILES/services.txt`
+isams=`grep -w "AMBARI_METRICS" $FILES/services.txt`
+iskafka=`grep -w "KAFKA" $FILES/services.txt`
+iszeppelin=`grep -w "ZEPPELIN" $FILES/services.txt`
 
 
 #if [ -z "$isatlas" ]
@@ -684,7 +687,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 # 3. Need DB password as user input values
 ############################################################################################################
 
-#israngerkms=`grep -wi "RANGER_KMS" $INTR/files/services.txt | tr -s '\n ' ','`
+#israngerkms=`grep -wi "RANGER_KMS" $FILES/services.txt | tr -s '\n ' ','`
 israngerkms=${israngerkms%,}
 
 if [ -z "$israngerkms" ]
@@ -751,7 +754,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 # 3. Need DB password as user input values
 ############################################################################################################
 
-#isranger=`grep -wi "RANGER" $INTR/files/services.txt | tr -s '\n ' ','`
+#isranger=`grep -wi "RANGER" $FILES/services.txt | tr -s '\n ' ','`
 isranger=${isranger%,}
 
 if [ -z "$isranger" ]
@@ -819,7 +822,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 # 3. Need DB password as user input values
 ############################################################################################################
 
-#israngerkms=`grep -wi "RANGER_KMS" $INTR/files/services.txt | tr -s '\n ' ','`
+#israngerkms=`grep -wi "RANGER_KMS" $FILES/services.txt | tr -s '\n ' ','`
 
 isoozie=${isoozie%,}
 
@@ -888,8 +891,8 @@ echo -e "\e[35m########################################################\e[0m\n"
 
 echo -e "\e[96mPREREQ - 5. Unsupported Services\e[0m \e[1mServices Installed - to be deleted before upgrade\e[21m"
 dep=`cat $RESOURCE/depricated-cdpdc$CDPDC.properties`
-services=`egrep -wi $dep $INTR/files/services.txt | grep -v -i spark2 | tr -s '\n ' ','`
-#services=`egrep -i "storm|ACCUMULO|SMARTSENSE|Superset|Flume|Mahout|Falcon|Slider|WebHCat|spark" $INTR/files/services.txt | grep -v -i spark2 | tr -s '\n ' ','`
+services=`egrep -wi $dep $FILES/services.txt | grep -v -i spark2 | tr -s '\n ' ','`
+#services=`egrep -i "storm|ACCUMULO|SMARTSENSE|Superset|Flume|Mahout|Falcon|Slider|WebHCat|spark" $FILES/services.txt | grep -v -i spark2 | tr -s '\n ' ','`
 services=${services%,}
 
 echo -e "\e[31mBelow services are installed in cluster $cluster_name and will be deleted as a part of upgrade:\e[0m  \n \e[1m$services\e[21m\n"
@@ -915,7 +918,7 @@ echo -e "########################################################\n" >>  $REVIEW
 ############################################################################################################
 
 echo -e "\e[96mPREREQ - 6. HDF Mpack Check\e[0m \e[1mChecking If Nifi Is Installed?\e[21m\n"
-isnifi=`grep -wi "NIFI" $INTR/files/services.txt | tr -s '\n ' ','`
+isnifi=`grep -wi "NIFI" $FILES/services.txt | tr -s '\n ' ','`
 isnifi=${isnifi%,}
 
 if [ -z "$isnifi" ];then
@@ -939,7 +942,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 ############################################################################################################
 echo -e "\e[96mPREREQ - 7. Third Party \e[0m \e[1mThird Party Services to be deleted before upgrade\e[21m"
 
-thirdparty=`egrep -vi "AMBARI_INFRA|FALCON|ZEPPELIN|OOZIE|LOGSEARCH|AMBARI_METRICS|ATLAS|FLUME|HBASE|HDFS|HIVE|KAFKA|MAPREDUCE2|PIG|RANGER|RANGER_KMS|SLIDER|SMARTSENSE|SPARK|SPARK2|SQOOP|TEZ|YARN|ZOOKEEPER|NIFI|NIFI_REGISTRY|REGISTRY|STREAMLINE|KERBEROS|KNOX|ACCUMULO|DRUID|MAHOUT|STORM|LOGSEARCH|SUPERSET" $INTR/files/services.txt | grep -v -i spark2 | tr -s '\n ' ','`
+thirdparty=`egrep -vi "AMBARI_INFRA|FALCON|ZEPPELIN|OOZIE|LOGSEARCH|AMBARI_METRICS|ATLAS|FLUME|HBASE|HDFS|HIVE|KAFKA|MAPREDUCE2|PIG|RANGER|RANGER_KMS|SLIDER|SMARTSENSE|SPARK|SPARK2|SQOOP|TEZ|YARN|ZOOKEEPER|NIFI|NIFI_REGISTRY|REGISTRY|STREAMLINE|KERBEROS|KNOX|ACCUMULO|DRUID|MAHOUT|STORM|LOGSEARCH|SUPERSET" $FILES/services.txt | grep -v -i spark2 | tr -s '\n ' ','`
 thirdparty=${thirdparty%,}
 
 if [ -z "$thirdparty" ];then
@@ -1044,7 +1047,7 @@ else
 							echo -e "\e[1mHive DB backup is available in Root directory of $hms_dbhost \e[21m" >> $BKP/database_bkp-$today.out
 							echo -e "Please check the logs in the file: \e[1m$LOGDIR/hive_databasebkp-$today.log & $LOGDIR/hivedb-version-$today.log \e[21m  \n"
 							echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"
-							echo -e "Please take a snapshot of directories in:\e[1m $INTR/review/hive-hdfs-snapshot-$today.out\e[21m"			
+							echo -e "Please take a snapshot of directories in:\e[1m $REVIEW/hive-hdfs-snapshot-$today.out\e[21m"			
 
 							break;;
  		
@@ -1055,7 +1058,7 @@ else
              			    echo -e "\e[1mPlease take a backup of Hive Database manually on $hms_dbhost \n- For mysql : mysqldump -u $hmsdb_user -p$hms_dbpwd $hive_database_name > hivedb.sql \n- For Psql: PGPASSWORD=$hms_dbpwd  pg_dump -p 5432 -U $hmsdb_user  $hive_database_name > hivedb.sql  \e[21m" >> $BKP/database_bkp-$today.out      
         					echo -e "Please check the logs in the file: \e[1m$LOGDIR/hivedb-version-$today.log \e[21m  \n"	
         					echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"
-        					echo -e "Please take a snapshot of directories in:\e[1m $INTR/review/hive-hdfs-snapshot-$today.out\e[21m"			
+        					echo -e "Please take a snapshot of directories in:\e[1m $REVIEW/hive-hdfs-snapshot-$today.out\e[21m"			
         					break;;
        	 			* ) echo "Please answer yes or no.";;
        			esac
@@ -1068,10 +1071,10 @@ else
                 echo -e "\e[1mPlease take a backup of Hive Database manually on $hms_dbhost \n- For mysql : mysqldump -u $hmsdb_user -p$hms_dbpwd $hive_database_name > hivedb.sql \n- For Psql: PGPASSWORD=$hms_dbpwd  pg_dump -p 5432 -U $hmsdb_user  $hive_database_name > hivedb.sql  \e[21m" >> $BKP/database_bkp-$today.out 
                 echo -e "Please check the logs in the file: \e[1m$LOGDIR/hivedb-version-$today.log \e[21m  \n"	     
         		echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"
-        		echo -e "Please take a snapshot of directories in:\e[1m $INTR/review/hive-hdfs-snapshot-$today.out\e[21m"			
+        		echo -e "Please take a snapshot of directories in:\e[1m $REVIEW/hive-hdfs-snapshot-$today.out\e[21m"			
 		fi
 			echo -e "\e[96mPREREQ - 9. HIVE CHECK\e[0m \e[1mRunning Hive table check which includes:\e[21m  \n 1. Hive 3 Upgrade Checks - Locations Scan \n 2. Hive 3 Upgrade Checks - Bad ORC Filenames \n 3. Hive 3 Upgrade Checks - Managed Table Migrations ( Ownership check & Conversion to ACID tables) \n 4. Hive 3 Upgrade Checks - Compaction Check \n 5. Questionable Serde's Check \n 6. Managed Table Shadows \n"
-			sh -x $SCRIPTDIR/hiveprereq.sh $INTR/files/hive_databases.txt $HIVECFG $REVIEW/hive  &> $LOGDIR/hivetablescan-$today.log &
+			sh -x $SCRIPTDIR/hiveprereq.sh $FILES/hive_databases.txt $HIVECFG $REVIEW/hive  &> $LOGDIR/hivetablescan-$today.log &
 			echo -e "Output is available in \e[1m $REVIEW/hive directory \e[21m"
 			echo -e "Please check the logs in the file:\e[1m $LOGDIR/hivetablescan-$today.log  \e[21m\n"
 			sleep 10
@@ -1115,12 +1118,12 @@ echo -e "\e[35m########################################################\e[0m\n"
 echo -e "\e[96mPREREQ - 11. DATABASE COMPATIBLITY CHECK \e[0m \e[1mChecking if database versions are supported ?\e[21m "
 echo -e "\e[1m Initiating Database Version Checks for required components\e[21m "
 
-if [[ -f $INTR/files/DB-versioncheck-$today.out && -f $RESOURCE/dbcomp-cdpdc$CDPDC.properties ]]; then
-	sh -x $SCRIPTDIR/dbcompatible.sh $INTR/files/DB-versioncheck-$today.out $today $REVIEW/servicecheck $CDPDC $RESOURCE &> $LOGDIR/DatabaseCompatibiltiyCheck-$today.log
+if [[ -f $FILES/DB-versioncheck-$today.out && -f $RESOURCE/dbcomp-cdpdc$CDPDC.properties ]]; then
+	sh -x $SCRIPTDIR/dbcompatible.sh $FILES/DB-versioncheck-$today.out $today $REVIEW/servicecheck $CDPDC $RESOURCE &> $LOGDIR/DatabaseCompatibiltiyCheck-$today.log
 	echo -e "\e[1mOutput is available in the file: $REVIEW/servicecheck/DatabaseCompatibiltiyCheck-$today.out \e[21m"
 	echo -e "\e[1mPlease check the logs in the file : $LOGDIR/DatabaseCompatibiltiyCheck-$today.log  \e[21m"
 else 
- 	echo -e "\e[31mDatabase version file $INTR/files/DB-versioncheck-$today.out or $RESOURCE/dbcomp-cdpdc$CDPDC.properties does not exist ! \e[0m"
+ 	echo -e "\e[31mDatabase version file $FILES/DB-versioncheck-$today.out or $RESOURCE/dbcomp-cdpdc$CDPDC.properties does not exist ! \e[0m"
  	echo -e "\e[31mPlease analyse the logs: $LOGDIR/rangerdatabasebkp-$today.log $LOGDIR/ranger_kms_databasebkp-$today.log $LOGDIR/hivetablescan-$today.log or confirm if this script supports CDP-DC-$CDPDC to find the problem ! \e[0m"
 fi
 echo -e "\e[35m########################################################\e[0m\n"
@@ -1316,7 +1319,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 
 echo -e "\n\e[96mPREREQ - 14. OS & Service Check \e[0m  \e[1mChecking OS compatibility and running service check\e[21m"
 
-sh -x $SCRIPTDIR/oscheck.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $REVIEW/os $today $INTR/files/ $PROTOCOL &> $LOGDIR/oscheck-$today.log  &
+sh -x $SCRIPTDIR/oscheck.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $REVIEW/os $today $FILES/ $PROTOCOL &> $LOGDIR/oscheck-$today.log  &
 
 echo -e "\e[1mOutput is available in the file: $REVIEW/os/oscheck-$today.out \e[21m"
 echo -e "Please check the logs in the file: \e[1m$LOGDIR/oscheck-$today.log\e[21m\n"
@@ -1332,7 +1335,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 ############################################################################################################
 
 echo -e "\e[96mPREREQ - 15. Maintenance Mode \e[0m"
-mmode=`egrep -i "SMARTSENSE|LOGSEARCH|AMBARI_METRICS" $INTR/files/services.txt | tr -s '\n ' ','`
+mmode=`egrep -i "SMARTSENSE|LOGSEARCH|AMBARI_METRICS" $FILES/services.txt | tr -s '\n ' ','`
 mmode=${mmode%,}
 
 echo -e "\e[1m Enable Maintenance Mode for $mmode\e[21m"
@@ -1513,7 +1516,7 @@ echo -e "\e[96mPREREQ - 19. Service Check \e[0m  \e[1mrunning service check\e[21
 while true; do
     read -p $'\n\e[96mAre you sure you wish to run service check on all components (y/n) ? :\e[0m' yn
     case $yn in
-        [Yy]* ) sh -x $SCRIPTDIR/run_all_service_check.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $REVIEW/os $today $INTR/files/ $PROTOCOL &> $LOGDIR/os-servicecheck-$today.log  &
+        [Yy]* ) sh -x $SCRIPTDIR/run_all_service_check.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $REVIEW/os $today $FILES/ $PROTOCOL &> $LOGDIR/os-servicecheck-$today.log  &
          break;;
         [Nn]* )  exit ; break;;
         * ) echo "Please answer yes or no.";;
