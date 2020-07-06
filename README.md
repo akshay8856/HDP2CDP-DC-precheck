@@ -24,6 +24,13 @@ The intent is to save the time required to prepare and perform upgrade.
 * Kafka PreUpgrade Check ( Ambari Manages Krb5/keytabs, Kadmin principal Hostname Check (MIT_KDC) , KDC Admin Host FQDN (MIT_KDC))
 
 * [Hive Pre Upgrade](https://github.com/dstreev/cloudera_upgrade_utils/blob/master/hive-sre/README.md)
+1. Hive 3 Upgrade Checks - Locations Scan
+2. Hive 3 Upgrade Checks - Bad ORC Filenames
+3. Hive 3 Upgrade Checks - Managed Table Migration
+4. Hive 3 Upgrade Checks - Compaction Check
+5. Questionable Serde's Check
+6. Managed Table Shadows
+7. Hive PreUpgrade Checks - HDFS snapshots
 
 * Ambari Auto Restart Enabled
 
@@ -49,8 +56,6 @@ The intent is to save the time required to prepare and perform upgrade.
 
 1. Hbase PreUpgrade Check 
 2. Kadmin principal Hostname Check (for AD)/ KDC Admin Host FQDN (for AD) / KDC Admin Credentials ??
-3. Hive Tables Snapshot
-4. Compaction of Hive Tables
 5. Config Group for multiple HS2 servers
 6. Support For Ubuntu and Oracle DB
 7. Backup of Data Dir for Databases 

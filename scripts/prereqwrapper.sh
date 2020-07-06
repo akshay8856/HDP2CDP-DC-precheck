@@ -87,7 +87,7 @@ if ! [ -x "$(command -v hdfs)" ]; then
 fi
 
 if ! [ -x "$(command -v hadoop)" ]; then
-  echo -e "\e[31mError: hadoop client is not installed.\e[0m"
+  echo -e "\e[31mError: hdfs client is not installed.\e[0m"
   exit 1
 fi
 
@@ -275,6 +275,8 @@ mkdir -p $INTR/resources
 
 echo -e "\n\e[1mCreating a list of services installed in cluster $cluster_name :$INTR/files/services.txt\e[21m"
 curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/services?fields=ServiceInfo/service_name" | python -mjson.tool | perl -ne '/"service_name":.*?"(.*?)"/ && print "$1\n"' > $INTR/files/services.txt
+hdfs_nameservice=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=HDFS" |  grep -w '"dfs.nameservices"' | tail -1 | awk -F ' : ' '{print $2}' | awk -F '"' '{print $2}')
+echo -e "hdfs_nameservice=$hdfs_nameservice" >> $FILES/clusterconfig.properties
 echo -e "\e[35m########################################################\e[0m\n"
 ############################################################################################################
 #
@@ -520,11 +522,13 @@ else
 	hmsdb_user=`echo $hmsjdbc |  awk -F ',' '{print $2}' | awk -F ':' '{print $2}' | awk -F '"' '{print $2}'`
 	hms_dtype=`echo $hms_jdbc_uri | awk -F ':' '{print $2}'`
 	hms_dbhost=`echo $hms_jdbc_uri | awk -F '/' '{print $3}'`
+	hms_warehouse=$(curl -s -u $LOGIN:$PASSWORD --insecure $PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=HIVE | grep -w '"hive.metastore.warehouse.dir"' |  awk -F ':' '{print $2}' |  awk -F '"' '{print $2}' | tail -1 )
 
 	echo -e "hms_dbhost=$hms_dbhost" >> $FILES/clusterconfig.properties
 	echo -e "hms_dtype=$hms_dtype" >> $FILES/clusterconfig.properties
 	echo -e "hive_database_name=$hive_database_name" >> $FILES/clusterconfig.properties
 	echo -e "hmsdb_user=$hmsdb_user" >> $FILES/clusterconfig.properties
+	echo -e "hms_warehouse=$hms_warehouse" >> $FILES/clusterconfig.properties
 
 
 # Function to create config.yaml file
@@ -1038,8 +1042,10 @@ else
   							sh -x $SCRIPTDIR/hivedatabaseversion.sh $today $INTR $FILES/clusterconfig.properties $hms_dbpwd &> $LOGDIR/hivedb-version-$today.log & 
 							echo -e "\e[1mHive DB backup is available in Root directory of $hms_dbhost \e[21m"
 							echo -e "\e[1mHive DB backup is available in Root directory of $hms_dbhost \e[21m" >> $BKP/database_bkp-$today.out
-							echo -e "Please check the logs in the file: \e[1m$LOGDIR/hive_databasebkp-$today.log & $LOGDIR/hivedb-version-$today.log \e[21m  \n"	
-							echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"			
+							echo -e "Please check the logs in the file: \e[1m$LOGDIR/hive_databasebkp-$today.log & $LOGDIR/hivedb-version-$today.log \e[21m  \n"
+							echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"
+							echo -e "Please take a snapshot of directories in:\e[1m $INTR/review/hive-hdfs-snapshot-$today.out\e[21m"			
+
 							break;;
  		
 
@@ -1049,6 +1055,7 @@ else
              			    echo -e "\e[1mPlease take a backup of Hive Database manually on $hms_dbhost \n- For mysql : mysqldump -u $hmsdb_user -p$hms_dbpwd $hive_database_name > hivedb.sql \n- For Psql: PGPASSWORD=$hms_dbpwd  pg_dump -p 5432 -U $hmsdb_user  $hive_database_name > hivedb.sql  \e[21m" >> $BKP/database_bkp-$today.out      
         					echo -e "Please check the logs in the file: \e[1m$LOGDIR/hivedb-version-$today.log \e[21m  \n"	
         					echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"
+        					echo -e "Please take a snapshot of directories in:\e[1m $INTR/review/hive-hdfs-snapshot-$today.out\e[21m"			
         					break;;
        	 			* ) echo "Please answer yes or no.";;
        			esac
@@ -1061,7 +1068,7 @@ else
                 echo -e "\e[1mPlease take a backup of Hive Database manually on $hms_dbhost \n- For mysql : mysqldump -u $hmsdb_user -p$hms_dbpwd $hive_database_name > hivedb.sql \n- For Psql: PGPASSWORD=$hms_dbpwd  pg_dump -p 5432 -U $hmsdb_user  $hive_database_name > hivedb.sql  \e[21m" >> $BKP/database_bkp-$today.out 
                 echo -e "Please check the logs in the file: \e[1m$LOGDIR/hivedb-version-$today.log \e[21m  \n"	     
         		echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"
-
+        		echo -e "Please take a snapshot of directories in:\e[1m $INTR/review/hive-hdfs-snapshot-$today.out\e[21m"			
 		fi
 			echo -e "\e[96mPREREQ - 9. HIVE CHECK\e[0m \e[1mRunning Hive table check which includes:\e[21m  \n 1. Hive 3 Upgrade Checks - Locations Scan \n 2. Hive 3 Upgrade Checks - Bad ORC Filenames \n 3. Hive 3 Upgrade Checks - Managed Table Migrations ( Ownership check & Conversion to ACID tables) \n 4. Hive 3 Upgrade Checks - Compaction Check \n 5. Questionable Serde's Check \n 6. Managed Table Shadows \n"
 			sh -x $SCRIPTDIR/hiveprereq.sh $INTR/files/hive_databases.txt $HIVECFG $REVIEW/hive  &> $LOGDIR/hivetablescan-$today.log &
