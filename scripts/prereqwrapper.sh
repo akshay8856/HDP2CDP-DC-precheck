@@ -71,6 +71,11 @@ if ! [ -x "$(command -v wget)" ]; then
   exit 1
 fi
 
+if ! [ -x "$(command -v tar)" ]; then
+  echo -e "\e[31mError: tar is not installed.\e[0m"
+  exit 1
+fi
+
 if ! [ -x "$(command -v ssh-keygen)" ]; then
   echo -e "\e[31mError: ssh-keygen is not installed.\e[0m"
   exit 1
@@ -244,6 +249,13 @@ fi
 # 				*******  CREATING DIRECTORY STRUCTURE *******
 # Do not change the order of the section marked with *******
 ############################################################################################################
+# Cleanup on exit
+cleanup_on_exit ()
+{
+tar -czf $1/hdp2cdp-$today.tar.gz  $1/backup $1/review $1/logs $1/files  --remove-files &> /dev/null
+}
+
+
 #SCRIPTDIR=$INTR/scripts
 SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 #INTR=/upgrade
@@ -276,25 +288,25 @@ mkdir -p $RESOURCE
 #  Do not change the order of the section marked with *******
 ############################################################################################################
 
-echo -e "\n\e[1mCreating a list of services installed in cluster $cluster_name :$FILES/services.txt\e[21m"
-curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/services?fields=ServiceInfo/service_name" | python -mjson.tool | perl -ne '/"service_name":.*?"(.*?)"/ && print "$1\n"' > $FILES/services.txt
+echo -e "\n\e[1mCreating a list of services installed in cluster $cluster_name :$FILES/services-$today.txt\e[21m"
+curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/services?fields=ServiceInfo/service_name" | python -mjson.tool | perl -ne '/"service_name":.*?"(.*?)"/ && print "$1\n"' > $FILES/services-$today.txt
 hdfs_nameservice=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=HDFS" |  grep -w '"dfs.nameservices"' | tail -1 | awk -F ' : ' '{print $2}' | awk -F '"' '{print $2}')
-echo -e "hdfs_nameservice=$hdfs_nameservice" >> $FILES/clusterconfig.properties
+echo -e "hdfs_nameservice=$hdfs_nameservice" >> $FILES/clusterconfig-$today.properties
 echo -e "\e[35m########################################################\e[0m\n"
 ############################################################################################################
 #
 #				 *******COLLECTING OTHER REQUIRED DETAILS WHICH CANNOT BE DERIVED FROM API's*******
 ## Do not change the order of the section marked with *******
 ############################################################################################################
-isranger=`grep -w "RANGER" $FILES/services.txt`
-israngerkms=`grep -w "RANGER_KMS" $FILES/services.txt`
-ishive=`grep -w "HIVE" $FILES/services.txt`
-iskerberos=`grep -w "KERBEROS" $FILES/services.txt`
-isoozie=`grep -w "OOZIE" $FILES/services.txt`
-isatlas=`grep -w "ATLAS" $FILES/services.txt`
-isams=`grep -w "AMBARI_METRICS" $FILES/services.txt`
-iskafka=`grep -w "KAFKA" $FILES/services.txt`
-iszeppelin=`grep -w "ZEPPELIN" $FILES/services.txt`
+isranger=`grep -w "RANGER" $FILES/services-$today.txt`
+israngerkms=`grep -w "RANGER_KMS" $FILES/services-$today.txt`
+ishive=`grep -w "HIVE" $FILES/services-$today.txt`
+iskerberos=`grep -w "KERBEROS" $FILES/services-$today.txt`
+isoozie=`grep -w "OOZIE" $FILES/services-$today.txt`
+isatlas=`grep -w "ATLAS" $FILES/services-$today.txt`
+isams=`grep -w "AMBARI_METRICS" $FILES/services-$today.txt`
+iskafka=`grep -w "KAFKA" $FILES/services-$today.txt`
+iszeppelin=`grep -w "ZEPPELIN" $FILES/services-$today.txt`
 
 
 #if [ -z "$isatlas" ]
@@ -314,6 +326,7 @@ if [ -z "$iskerberos" ]
 else
    	if ! [ -x "$(command -v kinit)" ]; then
    		echo -e "\e[31mError: Kerberos client is not installed.\e[0m"
+   		cleanup_on_exit $INTR
   		exit 1
   	fi
 fi
@@ -332,6 +345,7 @@ else
         		skipatlas=yes;	
                 break;;
         [Nn]* ) echo -e "\e[96mPlease configure Atals admin password by passing parameter -ATP or --atlas_pwd  \e[0m"
+        		cleanup_on_exit $INTR
         		exit;;
         * ) echo "Please answer yes or no.";;
     esac
@@ -352,13 +366,13 @@ else
 	zeppelin_storage=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=ZEPPELIN" |  grep -w '"zeppelin.notebook.storage"' | tail -1 | awk -F ' : ' '{print $2}' | awk -F '"' '{print $2}')
 	zeppelin_notebook=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=ZEPPELIN" |  grep -w '"zeppelin.notebook.dir"' | tail -1 | awk -F ' : ' '{print $2}' | awk -F '"' '{print $2}')
 	zeppelin_host=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/services/ZEPPELIN/components/ZEPPELIN_MASTER" | grep -w '"host_name"' | awk -F ' : ' '{print $2}' | awk -F '"' '{print $2}')
-	echo -e "zeppelin_user=$zeppelin_user" >> $FILES/clusterconfig.properties
-	echo -e "zeppelin_host=$zeppelin_host" >> $FILES/clusterconfig.properties
-	echo -e "zeppelin_notebook=$zeppelin_notebook" >> $FILES/clusterconfig.properties
-	echo -e "zeppelin_storage=$zeppelin_storage" >> $FILES/clusterconfig.properties
-	echo -e "zeppelin_conf=$zeppelin_conf" >> $FILES/clusterconfig.properties
-	echo -e "zeppelin_keytab=$zeppelin_keytab" >> $FILES/clusterconfig.properties
-	echo -e "zeppelin_princ=$zeppelin_princ" >> $FILES/clusterconfig.properties	
+	echo -e "zeppelin_user=$zeppelin_user" >> $FILES/clusterconfig-$today.properties
+	echo -e "zeppelin_host=$zeppelin_host" >> $FILES/clusterconfig-$today.properties
+	echo -e "zeppelin_notebook=$zeppelin_notebook" >> $FILES/clusterconfig-$today.properties
+	echo -e "zeppelin_storage=$zeppelin_storage" >> $FILES/clusterconfig-$today.properties
+	echo -e "zeppelin_conf=$zeppelin_conf" >> $FILES/clusterconfig-$today.properties
+	echo -e "zeppelin_keytab=$zeppelin_keytab" >> $FILES/clusterconfig-$today.properties
+	echo -e "zeppelin_princ=$zeppelin_princ" >> $FILES/clusterconfig-$today.properties	
 fi
 
 
@@ -379,7 +393,8 @@ else
         [Yy]* ) echo -e "" ; 
         		skipranger=yes;
         		break;;
-        [Nn]* ) exit;;
+        [Nn]* ) cleanup_on_exit $INTR ;
+        		exit;;
         * ) echo "Please answer yes or no.";;
     esac
    done
@@ -390,10 +405,10 @@ ranger_dbflavour=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_H
 ranger_dbname=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=RANGER" | grep -w db_name | awk -F ':' '{print $2}' | awk -F '"' '{print $2}' | tail -1)
 ranger_dbuser=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=RANGER" | grep -w db_user | awk -F ':' '{print $2}' | awk -F '"' '{print $2}' | tail -1)
 
-echo -e "ranger_dbhost=$ranger_dbhost" >> $FILES/clusterconfig.properties
-echo -e "ranger_dbflavour=$ranger_dbflavour" >> $FILES/clusterconfig.properties
-echo -e "ranger_dbname=$ranger_dbname" >> $FILES/clusterconfig.properties
-echo -e "ranger_dbuser=$ranger_dbuser" >> $FILES/clusterconfig.properties
+echo -e "ranger_dbhost=$ranger_dbhost" >> $FILES/clusterconfig-$today.properties
+echo -e "ranger_dbflavour=$ranger_dbflavour" >> $FILES/clusterconfig-$today.properties
+echo -e "ranger_dbname=$ranger_dbname" >> $FILES/clusterconfig-$today.properties
+echo -e "ranger_dbuser=$ranger_dbuser" >> $FILES/clusterconfig-$today.properties
    
 fi
 
@@ -413,7 +428,8 @@ else
         [Yy]* ) echo -e "" ; 
         		skiprangerkms=yes;
         		break;;
-        [Nn]* ) exit;;
+        [Nn]* ) cleanup_on_exit $INTR ;
+        		exit;;
         * ) echo "Please answer yes or no.";;
     esac
    done
@@ -424,10 +440,10 @@ ranger_kmsdbflavour=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBAR
 ranger_kmsdbname=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=RANGER_KMS" | grep -w db_name | awk -F ':' '{print $2}' | awk -F '"' '{print $2}' | tail -1)
 ranger_kmsdbuser=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=RANGER_KMS" | grep -w db_user | awk -F ':' '{print $2}' | awk -F '"' '{print $2}' | tail -1)
 
-echo -e "ranger_kmsdbhost=$ranger_kmsdbhost" >> $FILES/clusterconfig.properties
-echo -e "ranger_kmsdbflavour=$ranger_kmsdbflavour" >> $FILES/clusterconfig.properties
-echo -e "ranger_kmsdbname=$ranger_kmsdbname" >> $FILES/clusterconfig.properties
-echo -e "ranger_kmsdbuser=$ranger_kmsdbuser" >> $FILES/clusterconfig.properties
+echo -e "ranger_kmsdbhost=$ranger_kmsdbhost" >> $FILES/clusterconfig-$today.properties
+echo -e "ranger_kmsdbflavour=$ranger_kmsdbflavour" >> $FILES/clusterconfig-$today.properties
+echo -e "ranger_kmsdbname=$ranger_kmsdbname" >> $FILES/clusterconfig-$today.properties
+echo -e "ranger_kmsdbuser=$ranger_kmsdbuser" >> $FILES/clusterconfig-$today.properties
    
 
 fi
@@ -449,6 +465,7 @@ else
         		skipoozie=yes;	
                 break;;
         [Nn]* ) echo -e "\e[96mPlease configure Oozie database password by passing parameter -OP or --oozie_pwd  \e[0m"
+        		cleanup_on_exit $INTR ;
         		exit;;
         * ) echo "Please answer yes or no.";;
     esac
@@ -461,10 +478,10 @@ oozie_dbhost=`echo $ooziejdbcuri | awk -F '/' '{print $3}'`
 oozie_dbflavour=`echo $ooziejdbcuri | awk -F ':' '{print $2}'`
 oozie_dbuser=$(curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=OOZIE" | grep -w oozie.service.JPAService.jdbc.username | awk -F ':' '{print $2}' | awk -F '"' '{print $2}' | tail -1)
 
-echo -e "oozie_dbhost=$oozie_dbhost" >> $FILES/clusterconfig.properties
-echo -e "oozie_dbflavour=$oozie_dbflavour" >> $FILES/clusterconfig.properties
-echo -e "oozie_dbname=$oozie_dbname" >> $FILES/clusterconfig.properties
-echo -e "oozie_dbuser=$oozie_dbuser" >> $FILES/clusterconfig.properties
+echo -e "oozie_dbhost=$oozie_dbhost" >> $FILES/clusterconfig-$today.properties
+echo -e "oozie_dbflavour=$oozie_dbflavour" >> $FILES/clusterconfig-$today.properties
+echo -e "oozie_dbname=$oozie_dbname" >> $FILES/clusterconfig-$today.properties
+echo -e "oozie_dbuser=$oozie_dbuser" >> $FILES/clusterconfig-$today.properties
 
 fi
 
@@ -484,7 +501,8 @@ else
        		 	[Yy]* ) echo -e "" ; 
         				skiphive=yes;
        		    		break;;
-        		[Nn]* ) exit;;
+        		[Nn]* ) cleanup_on_exit $INTR ;
+        				exit;;
         		* ) echo "Please answer yes or no.";;
     		esac
    		done
@@ -503,7 +521,8 @@ else
     		read -p $'\n\e[96mDo You Still Wish to Proceed without (y/n) ? :\e[0m' yn
     		case $yn in
         		[Yy]* )  echo -e "\e[31mOK! Please note HIVE 3 has major changes !!! \e[0m" ; break;;
-        		[Nn]* )  exit ; break;;
+        		[Nn]* )  cleanup_on_exit $INTR ;
+        				 exit ; break;;
         		 * ) echo "Please answer yes or no.";;
     		esac
     	done
@@ -527,11 +546,11 @@ else
 	hms_dbhost=`echo $hms_jdbc_uri | awk -F '/' '{print $3}'`
 	hms_warehouse=$(curl -s -u $LOGIN:$PASSWORD --insecure $PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/configurations/service_config_versions?service_name=HIVE | grep -w '"hive.metastore.warehouse.dir"' |  awk -F ':' '{print $2}' |  awk -F '"' '{print $2}' | tail -1 )
 
-	echo -e "hms_dbhost=$hms_dbhost" >> $FILES/clusterconfig.properties
-	echo -e "hms_dtype=$hms_dtype" >> $FILES/clusterconfig.properties
-	echo -e "hive_database_name=$hive_database_name" >> $FILES/clusterconfig.properties
-	echo -e "hmsdb_user=$hmsdb_user" >> $FILES/clusterconfig.properties
-	echo -e "hms_warehouse=$hms_warehouse" >> $FILES/clusterconfig.properties
+	echo -e "hms_dbhost=$hms_dbhost" >> $FILES/clusterconfig-$today.properties
+	echo -e "hms_dtype=$hms_dtype" >> $FILES/clusterconfig-$today.properties
+	echo -e "hive_database_name=$hive_database_name" >> $FILES/clusterconfig-$today.properties
+	echo -e "hmsdb_user=$hmsdb_user" >> $FILES/clusterconfig-$today.properties
+	echo -e "hms_warehouse=$hms_warehouse" >> $FILES/clusterconfig-$today.properties
 
 
 # Function to create config.yaml file
@@ -598,6 +617,44 @@ queries:
 ## Exiting Hive check Loop
 fi
 
+
+if [ -z "$PWDSSH" ];then
+   while true; do
+    read -p $'\e[96mPlease confirm if password less SSH is configured between ALL NODES in cluster from this edge node:(y/n) ? :\e[0m' yn
+    case $yn in
+        [Yy]* )  export PWDSSH=y ; break;;
+        [Nn]* )  export PWDSSH=n ; break;;
+        * ) echo "Please answer yes(y) or no(n).";;
+    esac
+    done  
+fi
+
+
+if  [ "$PWDSSH" == "y" ];then
+	if ! [ -x "$(command -v pdsh)" ]; then
+  		echo -e "\e[31mError: pdsh is not installed.\e[0m"
+  
+		while true; do
+    		read -p $'\n\e[96mDo You Still Wish to Proceed without Disk Space Utilisation check (y/n) ? :\e[0m' yn
+    		case $yn in
+        		[Yy]* )  echo -e "\e[31mOK! Please note you will have to check Disk Space Utilisation Manually!!! \e[0m" ; 
+        				 export isdiskcheck=no ; 
+        				 break;;
+        		[Nn]* )  cleanup_on_exit $INTR ;
+        				 exit;;
+        		 * ) echo "Please answer yes or no.";;
+    		esac
+    	done    
+	else 
+	 	export isdiskcheck=yes
+	fi
+else 
+   export isdiskcheck=no ;
+   echo -e "\e[31mPlease note you will have to check Disk Space Utilisation Manually!!! \e[0m"
+fi
+
+
+
 echo -e "\e[35m########################################################\e[0m\n"
 
 ############################################################################################################
@@ -610,17 +667,6 @@ echo -e "\e[35m########################################################\e[0m\n"
 # 4. Flow: Backup ambari.properties , ambari-env.sh | Stop Ambari | Backup Database | Start Ambari
 # Do not change the order of the section marked with *******
 ############################################################################################################
-
-if [ -z "$PWDSSH" ];then
-   while true; do
-    read -p $'\e[96mPlease confirm if password less SSH is configured between Ambari, Ranger, RangerKMS, Oozie database and this node:(y/n) ? :\e[0m' yn
-    case $yn in
-        [Yy]* )  export PWDSSH=y ; break;;
-        [Nn]* )  export PWDSSH=n ; break;;
-        * ) echo "Please answer yes(y) or no(n).";;
-    esac
-    done  
-fi
 
 echo -e "\e[96mPREREQ - 1. Ambari Backup :\e[0m  \e[1m Ambari Backup and Config\e[21m \n 1. Taking Backup of ambari database \n 2. Taking Backup of ambari.properties \n 3. Taking Backup of ambari-env.sh \n 4. Checking if Namenode Service Timeout Is Configured? \n"
 
@@ -687,7 +733,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 # 3. Need DB password as user input values
 ############################################################################################################
 
-#israngerkms=`grep -wi "RANGER_KMS" $FILES/services.txt | tr -s '\n ' ','`
+#israngerkms=`grep -wi "RANGER_KMS" $FILES/services-$today.txt | tr -s '\n ' ','`
 israngerkms=${israngerkms%,}
 
 if [ -z "$israngerkms" ]
@@ -706,17 +752,17 @@ else
     			read -p $'\e[96mWe will need to stop and start Ranger_KMS for Database Backup. Please confirm if we should proceed (y/n) ? :\e[0m' yn
     			case $yn in
     				[Yy]* ) echo -e "\n\e[96mPREREQ - 2. Ranger_KMS Database \e[0m \e[1mTaking Backup of Ranger_KMS DB\e[21m"
-							sh -x $SCRIPTDIR/ranger_kmsdatabasebkp.sh $AMBARI_HOST $cluster_name $today $RANGER_KMS_PASSWORD $PROTOCOL $LOGIN $PASSWORD $PORT $FILES/clusterconfig.properties &> $LOGDIR/ranger_kms_databasebkp-$today.log &
-        					sh -x $SCRIPTDIR/ranger_kmsdatabaseversion.sh $today $INTR  $FILES/clusterconfig.properties $RANGER_KMS_PASSWORD  &> $LOGDIR/ranger_kmsdb-version-$today.log &        		
+							sh -x $SCRIPTDIR/ranger_kmsdatabasebkp.sh $AMBARI_HOST $cluster_name $today $RANGER_KMS_PASSWORD $PROTOCOL $LOGIN $PASSWORD $PORT $FILES/clusterconfig-$today.properties &> $LOGDIR/ranger_kms_databasebkp-$today.log &
+        					sh -x $SCRIPTDIR/ranger_kmsdatabaseversion.sh $today $INTR  $FILES/clusterconfig-$today.properties $RANGER_KMS_PASSWORD  &> $LOGDIR/ranger_kmsdb-version-$today.log &        		
         					echo -e "\e[1mRanger_KMS DB backup is available in Root directory of $ranger_kmsdbhost \e[21m"
-        					echo -e "\e[1mRanger_KMS DB backup is available in Root directory of $ranger_kmsdbhost \e[21m"  >> $BKP/database_bkp-$today.out		      		
+        					echo -e "Ranger_KMS DB backup is available in Root directory of $ranger_kmsdbhost"  >> $BKP/database_bkp-$today.out		      		
 							echo -e "Please check the logs in the file: \e[1m$LOGDIR/ranger_kms_databasebkp-$today.log & $LOGDIR/ranger_kmsdb-version-$today.log \e[21m  \n"
 							echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"
 							break;;
 					[Nn]* ) echo -e "\n\e[96mPREREQ - 2. Ranger_KMS Database \e[0m \e[1mTaking Backup of Ranger_KMS DB\e[21m"
-        					sh -x $SCRIPTDIR/ranger_kmsdatabaseversion.sh $today $INTR  $FILES/clusterconfig.properties $RANGER_KMS_PASSWORD  &> $LOGDIR/ranger_kmsdb-version-$today.log &        		
+        					sh -x $SCRIPTDIR/ranger_kmsdatabaseversion.sh $today $INTR  $FILES/clusterconfig-$today.properties $RANGER_KMS_PASSWORD  &> $LOGDIR/ranger_kmsdb-version-$today.log &        		
                 			echo -e "\e[1mPlease take a backup of Ranger_KMS Database manually on $ranger_kmsdbhost \n- For mysql : mysqldump -u $ranger_kmsdbuser -p$RANGER_KMS_PASSWORD $ranger_kmsdbname > rangerkmsdb.sql \n- For Psql: PGPASSWORD=$RANGER_KMS_PASSWORD  pg_dump -p 5432 -U $ranger_kmsdbuser  $ranger_kmsdbname > rangerkmsdb.sql  \e[21m"
-               				echo -e "\e[1mPlease take a backup of Ranger_KMS Database manually on $ranger_kmsdbhost \n- For mysql : mysqldump -u $ranger_kmsdbuser -p$RANGER_KMS_PASSWORD $ranger_kmsdbname > rangerkmsdb.sql \n- For Psql: PGPASSWORD=$RANGER_KMS_PASSWORD  pg_dump -p 5432 -U $ranger_kmsdbuser  $ranger_kmsdbname > rangerkmsdb.sql  \e[21m" >> $BKP/database_bkp-$today.out		
+               				echo -e "Please take a backup of Ranger_KMS Database manually on $ranger_kmsdbhost \n- For mysql : mysqldump -u $ranger_kmsdbuser -p$RANGER_KMS_PASSWORD $ranger_kmsdbname > rangerkmsdb.sql \n- For Psql: PGPASSWORD=$RANGER_KMS_PASSWORD  pg_dump -p 5432 -U $ranger_kmsdbuser  $ranger_kmsdbname > rangerkmsdb.sql" >> $BKP/database_bkp-$today.out		
 							echo -e "Please check the logs in the file: \e[1m$LOGDIR/ranger_kmsdb-version-$today.log \e[21m  \n"
 							echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"					 
         					break;;
@@ -726,11 +772,11 @@ else
 		else
 
 			echo -e "\n\e[96mPREREQ - 2. Ranger_KMS Database \e[0m \e[1mTaking Backup of Ranger_KMS DB\e[21m"
-        	sh -x $SCRIPTDIR/ranger_kmsdatabaseversion.sh $today $INTR  $FILES/clusterconfig.properties $RANGER_KMS_PASSWORD &> $LOGDIR/ranger_kmsdb-version-$today.log &        		
+        	sh -x $SCRIPTDIR/ranger_kmsdatabaseversion.sh $today $INTR  $FILES/clusterconfig-$today.properties $RANGER_KMS_PASSWORD &> $LOGDIR/ranger_kmsdb-version-$today.log &        		
             echo -e "\e[1mPlease take a backup of Ranger_KMS Database manually on $ranger_kmsdbhost \n- For mysql : mysqldump -u $ranger_kmsdbuser -p$RANGER_KMS_PASSWORD $ranger_kmsdbname > rangerkmsdb.sql \n- For Psql: PGPASSWORD=$RANGER_KMS_PASSWORD  pg_dump -p 5432 -U $ranger_kmsdbuser  $ranger_kmsdbname > rangerkmsdb.sql  \e[21m"
-            echo -e "\e[1mPlease take a backup of Ranger_KMS Database manually on $ranger_kmsdbhost \n- For mysql : mysqldump -u $ranger_kmsdbuser -p$RANGER_KMS_PASSWORD $ranger_kmsdbname > rangerkmsdb.sql \n- For Psql: PGPASSWORD=$RANGER_KMS_PASSWORD  pg_dump -p 5432 -U $ranger_kmsdbuser  $ranger_kmsdbname > rangerkmsdb.sql  \e[21m" >> $BKP/database_bkp-$today.out		
+            echo -e "Please take a backup of Ranger_KMS Database manually on $ranger_kmsdbhost \n- For mysql : mysqldump -u $ranger_kmsdbuser -p$RANGER_KMS_PASSWORD $ranger_kmsdbname > rangerkmsdb.sql \n- For Psql: PGPASSWORD=$RANGER_KMS_PASSWORD  pg_dump -p 5432 -U $ranger_kmsdbuser  $ranger_kmsdbname > rangerkmsdb.sql" >> $BKP/database_bkp-$today.out		
 			echo -e "Please check the logs in the file: \e[1m$LOGDIR/ranger_kmsdb-version-$today.log \e[21m  \n"				
-				echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"			
+			echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"			
 
 		fi
 
@@ -754,7 +800,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 # 3. Need DB password as user input values
 ############################################################################################################
 
-#isranger=`grep -wi "RANGER" $FILES/services.txt | tr -s '\n ' ','`
+#isranger=`grep -wi "RANGER" $FILES/services-$today.txt | tr -s '\n ' ','`
 isranger=${isranger%,}
 
 if [ -z "$isranger" ]
@@ -773,17 +819,17 @@ else
    				 read -p $'\e[96mWe will need to stop and start Ranger for Database Backup. Please confirm if we should proceed (y/n) ? :\e[0m' yn
     			 case $yn in
         				[Yy]* ) echo -e "\n\e[96mPREREQ -3. Ranger Database \e[0m \e[1mTaking Backup of Ranger DB\e[21m"
-                				sh -x $SCRIPTDIR/rangerdatabasebkp.sh $AMBARI_HOST $cluster_name $today $RANGERPASSWORD $PROTOCOL $LOGIN $PASSWORD $PORT $FILES/clusterconfig.properties &> $LOGDIR/rangerdatabasebkp-$today.log &
-        						sh -x $SCRIPTDIR/rangerdatabaseversion.sh $today $INTR $FILES/clusterconfig.properties $RANGERPASSWORD &> $LOGDIR/rangerdb-version-$today.log &        		
+                				sh -x $SCRIPTDIR/rangerdatabasebkp.sh $AMBARI_HOST $cluster_name $today $RANGERPASSWORD $PROTOCOL $LOGIN $PASSWORD $PORT $FILES/clusterconfig-$today.properties &> $LOGDIR/rangerdatabasebkp-$today.log &
+        						sh -x $SCRIPTDIR/rangerdatabaseversion.sh $today $INTR $FILES/clusterconfig-$today.properties $RANGERPASSWORD &> $LOGDIR/rangerdb-version-$today.log &        		
         						echo -e "\e[1mRanger DB backup is available in Root directory of $ranger_dbhost \e[21m"
-        						echo -e "\e[1mRanger DB backup is available in Root directory of $ranger_dbhost \e[21m" >> $BKP/database_bkp-$today.out
+        						echo -e "Ranger DB backup is available in Root directory of $ranger_dbhost" >> $BKP/database_bkp-$today.out
 								echo -e "Please check the logs in the file: \e[1m$LOGDIR/rangerdatabasebkp-$today.log & $LOGDIR/rangerdb-version-$today.log \e[21m  \n"	
 								echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"			
 								break;;
         				[Nn]* ) echo -e "\n\e[96mPREREQ -3. Ranger Database \e[0m \e[1mTaking Backup of Ranger DB\e[21m"
-        						sh -x $SCRIPTDIR/rangerdatabaseversion.sh $today $RANGERPASSWORD $INTR $FILES/clusterconfig.properties $RANGERPASSWORD  &> $LOGDIR/rangerdb-version-$today.log & 
+        						sh -x $SCRIPTDIR/rangerdatabaseversion.sh $today $RANGERPASSWORD $INTR $FILES/clusterconfig-$today.properties $RANGERPASSWORD  &> $LOGDIR/rangerdb-version-$today.log & 
                 				echo -e "\e[1mPlease take a backup of Ranger Database manually on $ranger_dbhost \n- For mysql : mysqldump -u $ranger_dbuser -p$RANGERPASSWORD $ranger_dbname > rangerdb.sql \n- For Psql: PGPASSWORD=$RANGERPASSWORD  pg_dump -p 5432 -U $ranger_dbuser  $ranger_dbname > rangerdb.sql  \e[21m"
-                				echo -e "\e[1mPlease take a backup of Ranger Database manually on $ranger_dbhost \n- For mysql : mysqldump -u $ranger_dbuser -p$RANGERPASSWORD $ranger_dbname > rangerdb.sql \n- For Psql: PGPASSWORD=$RANGERPASSWORD  pg_dump -p 5432 -U $ranger_dbuser  $ranger_dbname > rangerdb.sql  \e[21m" >> $BKP/database_bkp-$today.out      
+                				echo -e "Please take a backup of Ranger Database manually on $ranger_dbhost \n- For mysql : mysqldump -u $ranger_dbuser -p$RANGERPASSWORD $ranger_dbname > rangerdb.sql \n- For Psql: PGPASSWORD=$RANGERPASSWORD  pg_dump -p 5432 -U $ranger_dbuser  $ranger_dbname > rangerdb.sql" >> $BKP/database_bkp-$today.out      
 								echo -e "Please check the logs in the file: \e[1m$LOGDIR/rangerdb-version-$today.log \e[21m  \n"	        		
         						echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"
         						break;;
@@ -793,9 +839,9 @@ else
 			else
 
 				echo -e "\n\e[96mPREREQ -3. Ranger Database \e[0m \e[1mTaking Backup of Ranger DB\e[21m"
-        		sh -x $SCRIPTDIR/rangerdatabaseversion.sh $today $INTR $FILES/clusterconfig.properties $RANGERPASSWORD &> $LOGDIR/rangerdb-version-$today.log &        		
+        		sh -x $SCRIPTDIR/rangerdatabaseversion.sh $today $INTR $FILES/clusterconfig-$today.properties $RANGERPASSWORD &> $LOGDIR/rangerdb-version-$today.log &        		
                 echo -e "\e[1mPlease take a backup of Ranger Database manually  on $ranger_dbhost \n- For mysql : mysqldump -u $ranger_dbuser -p$RANGERPASSWORD $ranger_dbname > rangerdb.sql \n- For Psql: PGPASSWORD=$RANGERPASSWORD  pg_dump -p 5432 -U $ranger_dbuser  $ranger_dbname > rangerdbbkpi$now.sql  \e[21m"
-                echo -e "\e[1mPlease take a backup of Ranger Database manually on $ranger_dbhost \n- For mysql : mysqldump -u $ranger_dbuser -p$RANGERPASSWORD $ranger_dbname > rangerdb.sql \n- For Psql: PGPASSWORD=$RANGERPASSWORD  pg_dump -p 5432 -U $ranger_dbuser  $ranger_dbname > rangerdb.sql  \e[21m" >> $BKP/database_bkp-$today.out
+                echo -e "Please take a backup of Ranger Database manually on $ranger_dbhost \n- For mysql : mysqldump -u $ranger_dbuser -p$RANGERPASSWORD $ranger_dbname > rangerdb.sql \n- For Psql: PGPASSWORD=$RANGERPASSWORD  pg_dump -p 5432 -U $ranger_dbuser  $ranger_dbname > rangerdb.sql" >> $BKP/database_bkp-$today.out
 				echo -e "Please check the logs in the file: \e[1m$LOGDIR/rangerdb-version-$today.log \e[21m  \n"				
 				echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"
 
@@ -822,7 +868,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 # 3. Need DB password as user input values
 ############################################################################################################
 
-#israngerkms=`grep -wi "RANGER_KMS" $FILES/services.txt | tr -s '\n ' ','`
+#israngerkms=`grep -wi "RANGER_KMS" $FILES/services-$today.txt | tr -s '\n ' ','`
 
 isoozie=${isoozie%,}
 
@@ -844,18 +890,18 @@ else
   		  			read -p $'\e[96mWe will need to stop and start Oozie for Database Backup. Please confirm if we should proceed (y/n) ? :\e[0m' yn
     				case $yn in
     					[Yy]* ) echo -e "\n\e[96mPREREQ - 4. Oozie Database \e[0m \e[1mTaking Backup of Oozie DB\e[21m"
-  								sh -x $SCRIPTDIR/ooziedb.sh $AMBARI_HOST $cluster_name $today $OOZIE_PASSWORD $PROTOCOL $LOGIN $PASSWORD $PORT $FILES/clusterconfig.properties &> $LOGDIR/oozie_databasebkp-$today.log &
-  								sh -x $SCRIPTDIR/ooziedatabaseversion.sh $today $INTR $FILES/clusterconfig.properties $OOZIE_PASSWORD &> $LOGDIR/ooziedb-version-$today.log & 
+  								sh -x $SCRIPTDIR/ooziedb.sh $AMBARI_HOST $cluster_name $today $OOZIE_PASSWORD $PROTOCOL $LOGIN $PASSWORD $PORT $FILES/clusterconfig-$today.properties &> $LOGDIR/oozie_databasebkp-$today.log &
+  								sh -x $SCRIPTDIR/ooziedatabaseversion.sh $today $INTR $FILES/clusterconfig-$today.properties $OOZIE_PASSWORD &> $LOGDIR/ooziedb-version-$today.log & 
 								echo -e "\e[1mOozie DB backup is available in Root directory of $oozie_dbhost \e[21m"
-        						echo -e "\e[1mOozie DB backup is available in Root directory of $oozie_dbhost \e[21m" >> $BKP/database_bkp-$today.out
+        						echo -e "Oozie DB backup is available in Root directory of $oozie_dbhost" >> $BKP/database_bkp-$today.out
 	   		 					echo -e "Please check the logs in the file: \e[1m$LOGDIR/oozie_databasebkp-$today.log & $LOGDIR/ooziedb-version-$today.log \e[21m  \n"	
 	    						echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"			
 								break;;
 
 						[Nn]* ) echo -e "\n\e[96mPREREQ - 4. Oozie Database \e[0m \e[1mTaking Backup of Oozie DB\e[21m"
-  		        				sh -x $SCRIPTDIR/ooziedatabaseversion.sh $today $INTR $FILES/clusterconfig.properties $OOZIE_PASSWORD &> $LOGDIR/ooziedb-version-$today.log & 
+  		        				sh -x $SCRIPTDIR/ooziedatabaseversion.sh $today $INTR $FILES/clusterconfig-$today.properties $OOZIE_PASSWORD &> $LOGDIR/ooziedb-version-$today.log & 
  		        				echo -e "\e[1mPlease take a backup of Oozie Database manually on $oozie_dbhost \n- For mysql : mysqldump -u $oozie_dbuser -p$OOZIE_PASSWORD $oozie_dbname > ooziedb.sql \n- For Psql: PGPASSWORD=$OOZIE_PASSWORD  pg_dump -p 5432 -U $oozie_dbuser  $oozie_dbname > ooziedb.sql  \e[21m"
-                				echo -e "\e[1mPlease take a backup of Oozie Database manually on $oozie_dbhost \n- For mysql : mysqldump -u $oozie_dbuser -p$OOZIE_PASSWORD $oozie_dbname > ooziedb.sql \n- For Psql: PGPASSWORD=$OOZIE_PASSWORD  pg_dump -p 5432 -U $oozie_dbuser  $oozie_dbname > ooziedb.sql  \e[21m" >> $BKP/database_bkp-$today.out      
+                				echo -e "Please take a backup of Oozie Database manually on $oozie_dbhost \n- For mysql : mysqldump -u $oozie_dbuser -p$OOZIE_PASSWORD $oozie_dbname > ooziedb.sql \n- For Psql: PGPASSWORD=$OOZIE_PASSWORD  pg_dump -p 5432 -U $oozie_dbuser  $oozie_dbname > ooziedb.sql" >> $BKP/database_bkp-$today.out      
 	 		    				echo -e "Please check the logs in the file: \e[1m$LOGDIR/ooziedb-version-$today.log \e[21m \n"	  		
         						echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"
         						break;;
@@ -865,9 +911,9 @@ else
 		else
 
 			echo -e "\n\e[96mPREREQ - 4. Oozie Database \e[0m \e[1mTaking Backup of Oozie DB\e[21m"
-  			sh -x $SCRIPTDIR/ooziedatabaseversion.sh $today $INTR $FILES/clusterconfig.properties $OOZIE_PASSWORD &> $LOGDIR/ooziedb-version-$today.log & 
+  			sh -x $SCRIPTDIR/ooziedatabaseversion.sh $today $INTR $FILES/clusterconfig-$today.properties $OOZIE_PASSWORD &> $LOGDIR/ooziedb-version-$today.log & 
  		    echo -e "\e[1mPlease take a backup of Oozie Database manually on $oozie_dbhost \n- For mysql : mysqldump -u $oozie_dbuser -p$OOZIE_PASSWORD $ooziedb > ooziedb.sql \n- For Psql: PGPASSWORD=$OOZIE_PASSWORD  pg_dump -p 5432 -U $oozie_dbuser  $oozie_dbname > ooziedb.sql  \e[21m"
-            echo -e "\e[1mPlease take a backup of Oozie Database manually on $oozie_dbhost \n- For mysql : mysqldump -u $oozie_dbuser -p$OOZIE_PASSWORD $oozie_dbname > ooziedb.sql \n- For Psql: PGPASSWORD=$OOZIE_PASSWORD  pg_dump -p 5432 -U $oozie_dbuser  $oozie_dbname > ooziedb.sql  \e[21m" >> $BKP/database_bkp-$today.out      
+            echo -e "Please take a backup of Oozie Database manually on $oozie_dbhost \n- For mysql : mysqldump -u $oozie_dbuser -p$OOZIE_PASSWORD $oozie_dbname > ooziedb.sql \n- For Psql: PGPASSWORD=$OOZIE_PASSWORD  pg_dump -p 5432 -U $oozie_dbuser  $oozie_dbname > ooziedb.sql" >> $BKP/database_bkp-$today.out      
         	echo -e "Please check the logs in the file: \e[1m$LOGDIR/ooziedb-version-$today.log \e[21m  \n"
         	echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"
 		fi
@@ -891,8 +937,8 @@ echo -e "\e[35m########################################################\e[0m\n"
 
 echo -e "\e[96mPREREQ - 5. Unsupported Services\e[0m \e[1mServices Installed - to be deleted before upgrade\e[21m"
 dep=`cat $RESOURCE/depricated-cdpdc$CDPDC.properties`
-services=`egrep -wi $dep $FILES/services.txt | grep -v -i spark2 | tr -s '\n ' ','`
-#services=`egrep -i "storm|ACCUMULO|SMARTSENSE|Superset|Flume|Mahout|Falcon|Slider|WebHCat|spark" $FILES/services.txt | grep -v -i spark2 | tr -s '\n ' ','`
+services=`egrep -wi $dep $FILES/services-$today.txt | grep -v -i spark2 | tr -s '\n ' ','`
+#services=`egrep -i "storm|ACCUMULO|SMARTSENSE|Superset|Flume|Mahout|Falcon|Slider|WebHCat|spark" $FILES/services-$today.txt | grep -v -i spark2 | tr -s '\n ' ','`
 services=${services%,}
 
 echo -e "\e[31mBelow services are installed in cluster $cluster_name and will be deleted as a part of upgrade:\e[0m  \n \e[1m$services\e[21m\n"
@@ -918,7 +964,7 @@ echo -e "########################################################\n" >>  $REVIEW
 ############################################################################################################
 
 echo -e "\e[96mPREREQ - 6. HDF Mpack Check\e[0m \e[1mChecking If Nifi Is Installed?\e[21m\n"
-isnifi=`grep -wi "NIFI" $FILES/services.txt | tr -s '\n ' ','`
+isnifi=`grep -wi "NIFI" $FILES/services-$today.txt | tr -s '\n ' ','`
 isnifi=${isnifi%,}
 
 if [ -z "$isnifi" ];then
@@ -942,7 +988,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 ############################################################################################################
 echo -e "\e[96mPREREQ - 7. Third Party \e[0m \e[1mThird Party Services to be deleted before upgrade\e[21m"
 
-thirdparty=`egrep -vi "AMBARI_INFRA|FALCON|ZEPPELIN|OOZIE|LOGSEARCH|AMBARI_METRICS|ATLAS|FLUME|HBASE|HDFS|HIVE|KAFKA|MAPREDUCE2|PIG|RANGER|RANGER_KMS|SLIDER|SMARTSENSE|SPARK|SPARK2|SQOOP|TEZ|YARN|ZOOKEEPER|NIFI|NIFI_REGISTRY|REGISTRY|STREAMLINE|KERBEROS|KNOX|ACCUMULO|DRUID|MAHOUT|STORM|LOGSEARCH|SUPERSET" $FILES/services.txt | grep -v -i spark2 | tr -s '\n ' ','`
+thirdparty=`egrep -vi "AMBARI_INFRA|FALCON|ZEPPELIN|OOZIE|LOGSEARCH|AMBARI_METRICS|ATLAS|FLUME|HBASE|HDFS|HIVE|KAFKA|MAPREDUCE2|PIG|RANGER|RANGER_KMS|SLIDER|SMARTSENSE|SPARK|SPARK2|SQOOP|TEZ|YARN|ZOOKEEPER|NIFI|NIFI_REGISTRY|REGISTRY|STREAMLINE|KERBEROS|KNOX|ACCUMULO|DRUID|MAHOUT|STORM|LOGSEARCH|SUPERSET" $FILES/services-$today.txt | grep -v -i spark2 | tr -s '\n ' ','`
 thirdparty=${thirdparty%,}
 
 if [ -z "$thirdparty" ];then
@@ -974,19 +1020,19 @@ else
 		if [  -z "$interbrokerprotocolversion"  ]
 		then
 			echo -e "\e[1mTo successfully upgrade Kafka, you must set the inter.broker.protocol.version to match the protocol version used by the brokers and clients.\e[21m"
-			echo -e "\e[1mTo successfully upgrade Kafka, you must set the inter.broker.protocol.version to match the protocol version used by the brokers and clients.\e[21m\n" >> $REVIEW/servicecheck/kafka-check-$today.out
+			echo -e "To successfully upgrade Kafka, you must set the inter.broker.protocol.version to match the protocol version used by the brokers and clients.\n" >> $REVIEW/servicecheck/kafka-check-$today.out
 		else
 			echo -e "\e[1mTo successfully upgrade Kafka, please confirm the value of inter.broker.protocol.version=$interbrokerprotocolversion is set correctly\e[21m"
-			echo -e "\e[1mTo successfully upgrade Kafka, please confirm the value of inter.broker.protocol.version=$interbrokerprotocolversion is set correctly\e[21m\n" >> $REVIEW/servicecheck/kafka-check-$today.out
+			echo -e "To successfully upgrade Kafka, please confirm the value of inter.broker.protocol.version=$interbrokerprotocolversion is set correctly\n" >> $REVIEW/servicecheck/kafka-check-$today.out
 		fi
 		
 		if [  -z "$logmessageformatversion"  ]
 		then
 			echo -e "\e[1mTo successfully upgrade Kafka, you must set the log.message.format.version to match the protocol version used by the brokers and clients.\e[21m"
-			echo -e "\e[1mTo successfully upgrade Kafka, you must set the log.message.format.version to match the protocol version used by the brokers and clients.\e[21m\n" >> $REVIEW/servicecheck/kafka-check-$today.out
+			echo -e "To successfully upgrade Kafka, you must set the log.message.format.version to match the protocol version used by the brokers and clients.\n" >> $REVIEW/servicecheck/kafka-check-$today.out
 		else
 			echo -e "\e[1mTo successfully upgrade Kafka, please confirm the value of log.message.format.version=$interbrokerprotocolversion is set correctly\e[21m"
-			echo -e "\e[1mTo successfully upgrade Kafka, please confirm the value of log.message.format.version=$logmessageformatversion is set correctly\e[21m\n" >> $REVIEW/servicecheck/kafka-check-$today.out
+			echo -e "To successfully upgrade Kafka, please confirm the value of log.message.format.version=$logmessageformatversion is set correctly\n" >> $REVIEW/servicecheck/kafka-check-$today.out
 		fi
 		
 		echo -e "\e[1mReference : http://tiny.cloudera.com/kafkaprecheck\e[21m"
@@ -1040,40 +1086,41 @@ else
   			while true; do
     			read -p $'\e[96mWe will need to stop and start Hive for Database Backup. Please confirm if we should proceed (y/n) ? :\e[0m' yn
     			case $yn in
-    				[Yy]* ) echo -e "\e[96mPREREQ - 9. HIVE CHECK\e[0m \e[1m Hive Database Backup\e[21m"
-							sh -x $SCRIPTDIR/hivedbbkp.sh $AMBARI_HOST $cluster_name $today $hms_dbpwd $PROTOCOL $LOGIN $PASSWORD $PORT $FILES/clusterconfig.properties &> $LOGDIR/hive_databasebkp-$today.log &
-  							sh -x $SCRIPTDIR/hivedatabaseversion.sh $today $INTR $FILES/clusterconfig.properties $hms_dbpwd &> $LOGDIR/hivedb-version-$today.log & 
+    				[Yy]* ) echo -e "\n\e[96mPREREQ - 9. HIVE CHECK\e[0m \e[1m Hive Database Backup & Hive PreUpgrade - HDFS snapshots\e[21m"
+							sh -x $SCRIPTDIR/hivedbbkp.sh $AMBARI_HOST $cluster_name $today $hms_dbpwd $PROTOCOL $LOGIN $PASSWORD $PORT $FILES/clusterconfig-$today.properties &> $LOGDIR/hive_databasebkp-$today.log &
+  							sh -x $SCRIPTDIR/hivedatabaseversion.sh $today $INTR $FILES/clusterconfig-$today.properties $hms_dbpwd &> $LOGDIR/hivedb-version-$today.log & 
 							echo -e "\e[1mHive DB backup is available in Root directory of $hms_dbhost \e[21m"
-							echo -e "\e[1mHive DB backup is available in Root directory of $hms_dbhost \e[21m" >> $BKP/database_bkp-$today.out
+							echo -e "Hive DB backup is available in Root directory of $hms_dbhost" >> $BKP/database_bkp-$today.out
 							echo -e "Please check the logs in the file: \e[1m$LOGDIR/hive_databasebkp-$today.log & $LOGDIR/hivedb-version-$today.log \e[21m  \n"
 							echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"
-							echo -e "Please take a snapshot of directories in:\e[1m $REVIEW/hive-hdfs-snapshot-$today.out\e[21m"			
+							echo -e "Please take a snapshot of :\e[1m $hms_warehouse & directories in $REVIEW/hive/hive-hdfs-snapshot-$today.out\n\e[21m"			
 
 							break;;
  		
 
- 					[Nn]* ) echo -e "\e[96mPREREQ - 9. HIVE CHECK\e[0m \e[1m Hive Database Backup\e[21m"
- 							sh -x $SCRIPTDIR/hivedatabaseversion.sh $today $INTR $FILES/clusterconfig.properties $hms_dbpwd &> $LOGDIR/hivedb-version-$today.log & 
+ 					[Nn]* ) echo -e "\n\e[96mPREREQ - 9. HIVE CHECK\e[0m \e[1m Hive Database Backup & Hive PreUpgrade - HDFS snapshots\e[21m"
+ 							sh -x $SCRIPTDIR/hivedatabaseversion.sh $today $INTR $FILES/clusterconfig-$today.properties $hms_dbpwd &> $LOGDIR/hivedb-version-$today.log & 
  							echo -e "\e[1mPlease take a backup of Hive Database manually on $hms_dbhost \n- For mysql : mysqldump -u $hmsdb_user -p$hms_dbpwd $hive_database_name > hivedb.sql \n- For Psql: PGPASSWORD=$hms_dbpwd  pg_dump -p 5432 -U $hmsdb_user  $hive_database_name > hivedb.sql  \e[21m"
-             			    echo -e "\e[1mPlease take a backup of Hive Database manually on $hms_dbhost \n- For mysql : mysqldump -u $hmsdb_user -p$hms_dbpwd $hive_database_name > hivedb.sql \n- For Psql: PGPASSWORD=$hms_dbpwd  pg_dump -p 5432 -U $hmsdb_user  $hive_database_name > hivedb.sql  \e[21m" >> $BKP/database_bkp-$today.out      
+             			    echo -e "Please take a backup of Hive Database manually on $hms_dbhost \n- For mysql : mysqldump -u $hmsdb_user -p$hms_dbpwd $hive_database_name > hivedb.sql \n- For Psql: PGPASSWORD=$hms_dbpwd  pg_dump -p 5432 -U $hmsdb_user  $hive_database_name > hivedb.sql" >> $BKP/database_bkp-$today.out      
         					echo -e "Please check the logs in the file: \e[1m$LOGDIR/hivedb-version-$today.log \e[21m  \n"	
         					echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"
-        					echo -e "Please take a snapshot of directories in:\e[1m $REVIEW/hive-hdfs-snapshot-$today.out\e[21m"			
+							echo -e "Please take a snapshot of :\e[1m $hms_warehouse & directories in $REVIEW/hive/hive-hdfs-snapshot-$today.out\n\e[21m"			
         					break;;
        	 			* ) echo "Please answer yes or no.";;
        			esac
   	 		done
 		else
 
-				echo -e "\e[96mPREREQ - 9. HIVE CHECK\e[0m \e[1m Hive Database Backup\e[21m"
- 				sh -x $SCRIPTDIR/hivedatabaseversion.sh $today $INTR $FILES/clusterconfig.properties $hms_dbpwd &> $LOGDIR/hivedb-version-$today.log & 
+				echo -e "\n\e[96mPREREQ - 9. HIVE CHECK\e[0m \e[1m Hive Database Backup & Hive PreUpgrade - HDFS snapshots\e[21m"
+ 				sh -x $SCRIPTDIR/hivedatabaseversion.sh $today $INTR $FILES/clusterconfig-$today.properties $hms_dbpwd &> $LOGDIR/hivedb-version-$today.log & 
  				echo -e "\e[1mPlease take a backup of Hive Database manually on $hms_dbhost \n- For mysql : mysqldump -u $hmsdb_user -p$hms_dbpwd $hive_database_name > hivedb.sql \n- For Psql: PGPASSWORD=$hms_dbpwd  pg_dump -p 5432 -U $hmsdb_user  $hive_database_name > hivedb.sql  \e[21m"
-                echo -e "\e[1mPlease take a backup of Hive Database manually on $hms_dbhost \n- For mysql : mysqldump -u $hmsdb_user -p$hms_dbpwd $hive_database_name > hivedb.sql \n- For Psql: PGPASSWORD=$hms_dbpwd  pg_dump -p 5432 -U $hmsdb_user  $hive_database_name > hivedb.sql  \e[21m" >> $BKP/database_bkp-$today.out 
+                echo -e "Please take a backup of Hive Database manually on $hms_dbhost \n- For mysql : mysqldump -u $hmsdb_user -p$hms_dbpwd $hive_database_name > hivedb.sql \n- For Psql: PGPASSWORD=$hms_dbpwd  pg_dump -p 5432 -U $hmsdb_user  $hive_database_name > hivedb.sql" >> $BKP/database_bkp-$today.out 
                 echo -e "Please check the logs in the file: \e[1m$LOGDIR/hivedb-version-$today.log \e[21m  \n"	     
         		echo -e "Output is available in file:\e[1m $BKP/database_bkp-$today.out\e[21m"
-        		echo -e "Please take a snapshot of directories in:\e[1m $REVIEW/hive-hdfs-snapshot-$today.out\e[21m"			
+				echo -e "Please take a snapshot of :\e[1m $hms_warehouse & directories in $REVIEW/hive/hive-hdfs-snapshot-$today.out\n\e[21m"			
+
 		fi
-			echo -e "\e[96mPREREQ - 9. HIVE CHECK\e[0m \e[1mRunning Hive table check which includes:\e[21m  \n 1. Hive 3 Upgrade Checks - Locations Scan \n 2. Hive 3 Upgrade Checks - Bad ORC Filenames \n 3. Hive 3 Upgrade Checks - Managed Table Migrations ( Ownership check & Conversion to ACID tables) \n 4. Hive 3 Upgrade Checks - Compaction Check \n 5. Questionable Serde's Check \n 6. Managed Table Shadows \n"
+			echo -e "\n\e[96mPREREQ - 9. HIVE CHECK\e[0m \e[1mRunning Hive table check which includes:\e[21m  \n 1. Hive 3 Upgrade Checks - Locations Scan \n 2. Hive 3 Upgrade Checks - Bad ORC Filenames \n 3. Hive 3 Upgrade Checks - Managed Table Migrations ( Ownership check & Conversion to ACID tables) \n 4. Hive 3 Upgrade Checks - Compaction Check \n 5. Questionable Serde's Check \n 6. Managed Table Shadows \n"
 			sh -x $SCRIPTDIR/hiveprereq.sh $FILES/hive_databases.txt $HIVECFG $REVIEW/hive  &> $LOGDIR/hivetablescan-$today.log &
 			echo -e "Output is available in \e[1m $REVIEW/hive directory \e[21m"
 			echo -e "Please check the logs in the file:\e[1m $LOGDIR/hivetablescan-$today.log  \e[21m\n"
@@ -1317,7 +1364,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 ############################################################################################################
 
 
-echo -e "\n\e[96mPREREQ - 14. OS & Service Check \e[0m  \e[1mChecking OS compatibility and running service check\e[21m"
+echo -e "\n\e[96mPREREQ - 14. OS Check\e[0m  \e[1mChecking OS compatibility and running service check\e[21m"
 
 sh -x $SCRIPTDIR/oscheck.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $REVIEW/os $today $FILES/ $PROTOCOL &> $LOGDIR/oscheck-$today.log  &
 
@@ -1335,7 +1382,7 @@ echo -e "\e[35m########################################################\e[0m\n"
 ############################################################################################################
 
 echo -e "\e[96mPREREQ - 15. Maintenance Mode \e[0m"
-mmode=`egrep -i "SMARTSENSE|LOGSEARCH|AMBARI_METRICS" $FILES/services.txt | tr -s '\n ' ','`
+mmode=`egrep -i "SMARTSENSE|LOGSEARCH|AMBARI_METRICS" $FILES/services-$today.txt | tr -s '\n ' ','`
 mmode=${mmode%,}
 
 echo -e "\e[1m Enable Maintenance Mode for $mmode\e[21m"
@@ -1471,7 +1518,7 @@ else
     			case $yn in
     				[Yy]* ) echo -e "\e[96mPREREQ - 18. ZEPPELIN PREUPGRADE STEPS \e[0m"
   
-							sh -x $SCRIPTDIR/zeppelinbkp.sh $FILES/clusterconfig.properties $iskerberos &> $LOGDIR/zeppelin-preupgrade-$today.log &
+							sh -x $SCRIPTDIR/zeppelinbkp.sh $FILES/clusterconfig-$today.properties $iskerberos &> $LOGDIR/zeppelin-preupgrade-$today.log &
 							echo -e "\e[1mBackup of all notebooks is available on $zeppelin_host in /var/lib/zeppelin/$zeppelin_notebook \e[21m"
 							echo -e "Backup of all notebooks is available on $zeppelin_host in /var/lib/zeppelin/$zeppelin_notebook" >> $REVIEW/servicecheck/zeppelin-preupgrade-$today.out
 							echo -e "\e[1mBackup of interpreter.json and notebook-authorization.json is available on $zeppelin_host in /var/lib/zeppelin/$zeppelin_conf \e[21m"
@@ -1504,6 +1551,40 @@ fi
 
 echo -e "\e[35m########################################################\e[0m\n"
 
+############################################################################################################
+#
+# 					 DISK CHECK
+#
+# 
+############################################################################################################
+
+if  [ "$isdiskcheck" == "no" ];then
+	echo -e "\n\e[31mPassword less ssh is not configured, Skipping\e[0m \e[96mPREREQ - 19. Disk Space Utilisation Check \e[0m"
+	echo -e "\e[1mDisk Space: Be sure to have adequate space on /usr/hdp for the target HDP version. Each complete install of an HDP version occupies about 6 to 7 GB of disk space.\e[21m"	
+	echo -e "Disk Space: Be sure to have adequate space on /usr/hdp for the target HDP version. Each complete install of an HDP version occupies about 6 to 7 GB of disk space." >> $REVIEW/os/diskcheck-$today.out
+	echo -e "\e[1mOutput is available in file:$REVIEW/os/diskcheck-$today.out\e[21m"
+else
+	if [ ! -f $FILES/hosts-$today.out ]; then
+    	 echo -e "\e[31mUnable to Find hosts file ! \e[0m"
+    	 curl -s -u $LOGIN:$PASSWORD --insecure "$PROTOCOL://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/hosts" |  grep -w '"host_name"' | awk -F ' : ' '{print $2}' | awk -F '"' '{print $2}'  >> $FILES/hosts-$today.out
+		 sleep 5
+		 echo -e "\e[96mPREREQ - 19. Disk Space Utilisation Check \e[0m"
+	     echo "node: 		Filesystem      Size  Used Avail Use% Mounted on" > $REVIEW/os/diskcheck-$today.out
+	     sh -x $SCRIPTDIR/diskcheck.sh $FILES/hosts-$today.out $REVIEW/os/diskcheck-$today.out &> $LOGDIR/diskcheck-$today.log &
+  		 echo -e "\e[1mPlease check the logs in the file: $LOGDIR/diskcheck-$today.log\e[21m"				
+		 echo -e "\e[1mOutput is available in file:$REVIEW/os/diskcheck-$today.out\e[21m"
+    	 echo -e "\e[1mDisk Space: Be sure to have adequate space on /usr/hdp for the target HDP version. Each complete install of an HDP version occupies about 6 to 7 GB of disk space.\e[21m"		
+	else   
+	    echo -e "\e[96mPREREQ - 19. Disk Space Utilisation Check \e[0m"
+	    echo "node: 		Filesystem      Size  Used Avail Use% Mounted on" > $REVIEW/os/diskcheck-$today.out
+	    sh -x $SCRIPTDIR/diskcheck.sh $FILES/hosts-$today.out $REVIEW/os/diskcheck-$today.out &> $LOGDIR/diskcheck-$today.log &
+  		echo -e "\e[1mPlease check the logs in the file: $LOGDIR/diskcheck-$today.log\e[21m"				
+		echo -e "\e[1mOutput is available in file:$REVIEW/os/diskcheck-$today.out\e[21m"
+		echo -e "\e[1mDisk Space: Be sure to have adequate space on /usr/hdp for the target HDP version. Each complete install of an HDP version occupies about 6 to 7 GB of disk space.\e[21m"		
+  	fi
+fi
+
+echo -e "\e[35m########################################################\e[0m\n"
 
 ############################################################################################################
 #
@@ -1512,17 +1593,18 @@ echo -e "\e[35m########################################################\e[0m\n"
 # 1. Will run service checks on all the services installed in cluster.
 ############################################################################################################
 
-echo -e "\e[96mPREREQ - 19. Service Check \e[0m  \e[1mrunning service check\e[21m"
+echo -e "\e[96mPREREQ - 20. Service Check \e[0m  \e[1mrunning service check\e[21m"
 while true; do
     read -p $'\n\e[96mAre you sure you wish to run service check on all components (y/n) ? :\e[0m' yn
     case $yn in
         [Yy]* ) sh -x $SCRIPTDIR/run_all_service_check.sh $AMBARI_HOST $PORT $LOGIN $PASSWORD $REVIEW/os $today $FILES/ $PROTOCOL &> $LOGDIR/os-servicecheck-$today.log  &
          break;;
-        [Nn]* )  exit ; break;;
+        [Nn]* )  break;;
         * ) echo "Please answer yes or no.";;
     esac
 done
 echo -e "Please check the logs in the file: \e[1m$LOGDIR/os-servicecheck-$today.log\e[21m\n"
 echo -e "\e[35m########################################################\e[0m\n"
+
 
 

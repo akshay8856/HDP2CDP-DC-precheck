@@ -39,9 +39,9 @@ if  [ "$hms_dtype" == "mysql" ];then
 
     if [ -z "$hdfs_nameservice" ]
 	then
-   			cat $vcheck/files/hive-hdfs-snapshot-$now.out | awk -F '\t' '{print $3}' | awk -F ':' '{print $3}' | sed 's/^.\{4\}//' >> $vcheck/review/hive-hdfs-snapshot-$now.out
+   			cat $vcheck/files/hive-hdfs-snapshot-$now.out | grep -v $hms_warehouse |  awk -F '\t' '{print $3}' | awk -F ':' '{print $3}' | sed 's/^.\{4\}//' >> $vcheck/review/hive/hive-hdfs-snapshot-$now.out
 	else
-			cat $vcheck/files/hive-hdfs-snapshot-$now.out | awk -F '\t' '{print $3}' | awk -F ':' '{print $2}' | sed "s/\/\/$hdfs_nameservice//" >> $vcheck/review/hive-hdfs-snapshot-$now.out
+			cat $vcheck/files/hive-hdfs-snapshot-$now.out | grep -v $hms_warehouse | awk -F '\t' '{print $3}' | awk -F ':' '{print $2}' | sed "s/\/\/$hdfs_nameservice//" >> $vcheck/review/hive/hive-hdfs-snapshot-$now.out
 	fi
 
 elif  [ "$hms_dtype" == "postgresql" ];then
@@ -55,12 +55,12 @@ elif  [ "$hms_dtype" == "postgresql" ];then
 
    if [ -z "$hdfs_nameservice" ]
 	then
-   			cat $vcheck/files/hive-hdfs-snapshot-$now.out | awk -F '|' '{print $3}' | awk -F ':' '{print $3}'|  sed 's/^.\{4\}//' >> $vcheck/review/hive-hdfs-snapshot-$now.out
+   			cat $vcheck/files/hive-hdfs-snapshot-$now.out | grep -v $hms_warehouse | awk -F '|' '{print $3}' | awk -F ':' '{print $3}'|  sed 's/^.\{4\}//' >> $vcheck/review/hive/hive-hdfs-snapshot-$now.out
 	else
-			cat $vcheck/files/hive-hdfs-snapshot-$now.out | awk -F '|' '{print $3}' | awk -F ':' '{print $2}' | sed "s/\/\/$hdfs_nameservice//" >> $vcheck/review/hive-hdfs-snapshot-$now.out
+			cat $vcheck/files/hive-hdfs-snapshot-$now.out | grep -v $hms_warehouse | awk -F '|' '{print $3}' | awk -F ':' '{print $2}' | sed "s/\/\/$hdfs_nameservice//" >> $vcheck/review/hive/hive-hdfs-snapshot-$now.out
 	fi
 
 else
-  echo -e  "Please configured this script with the command to take backup for $hms_dtype \n"
+  echo -e  "Please configure this script with the command to take backup for $hms_dtype \n"
 
 fi

@@ -30,7 +30,7 @@ fi
 
 # OS version check
 echo -e "\nChecking if OS version of the nodes in cluster $cluster_name is compatible for upgrade"
-curl -s -u $LOGIN:$PASSWORD --insecure "$protocol://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/hosts" | grep host_name | awk -F ':' '{print $2}' |  awk -F '"' '{print $2}' >  $intr/hosts.txt
+curl -s -u $LOGIN:$PASSWORD --insecure "$protocol://$AMBARI_HOST:$PORT/api/v1/clusters/$cluster_name/hosts" | grep host_name | awk -F ':' '{print $2}' |  awk -F '"' '{print $2}' >  $intr/hosts-$date.out
 
 
 while IFS= read -r host
@@ -45,7 +45,7 @@ else
  echo -e "Major version of Operating system for $host is compatible for upgrade" >> $OSOUT/oscheck-$date.out
 fi
 
-done < $intr/hosts.txt
+done < $intr/hosts-$date.out
 
 echo -e "\nPlease refer "http://tiny.cloudera.com/oscomp" to confirm Operating System Requirements" >> $OSOUT/oscheck-$date.out
 echo -e "\nOS compatibility check completed for$cluster_name. \n please check the output in $OSOUT/oscheck-$date.out"

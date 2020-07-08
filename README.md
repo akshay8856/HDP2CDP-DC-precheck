@@ -50,6 +50,8 @@ The intent is to save the time required to prepare and perform upgrade.
 
 * Preparing Zeppelin before preupgrade 
 
+* Disk Utilisation Check
+
 * Service Check
 
 ### To Add 
@@ -60,7 +62,6 @@ The intent is to save the time required to prepare and perform upgrade.
 6. Support For Ubuntu and Oracle DB
 7. Backup of Data Dir for Databases 
 8. Host Maintenance Mode
-9. Disk Space
 10. Service Maintenance Mode
 11. Backing up Ambari infra data and migrating Atlas data
 12. Checkpoint HDFS
@@ -94,8 +95,8 @@ psql -h node3.example.com -u rangerdba ranger
 Enter Password for rangerdba: 
 ```
 
-3. Configure passwordless SSH access between edge node to Ambari, Zeppelin Master, KDC/Kadmin server & Database server(Ambari, Ranger, RangerKMS, HiveMetastore and Oozie)
-*Note: If passwordless SSH cannot be configured you will have to perform few checks manually.
+3. Configure passwordless SSH access between edge node to All nodes in the cluster.
+*Note: If passwordless SSH cannot be configured you will have to perform most of the checks manually.
 
 4. Hive Client Must be Installed on the node where this script is executed.
 
